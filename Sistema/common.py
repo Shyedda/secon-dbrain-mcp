@@ -97,11 +97,14 @@ def note_dirs(root=ROOT):
 
 def python_executable(root=ROOT):
     """Use the library's environment when installed, otherwise the current Python."""
+    root = Path(root).expanduser().resolve()
     for suffix in (".venv/Scripts/python.exe", ".venv/bin/python"):
-        candidate = Path(root) / suffix
+        candidate = root / suffix
         if candidate.is_file():
-            return candidate.resolve()
-    return Path(sys.executable).resolve()
+            # On Unix the executable is a symlink; resolving it would bypass
+            # pyvenv.cfg and start the base Python without this environment.
+            return candidate
+    return Path(sys.executable).absolute()
 
 def actor(explicit=None):
     """Who performs a writer operation: explicit flag, agent environment or a human."""

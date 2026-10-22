@@ -33,7 +33,7 @@ def _mcp(root, python=None):
     name = integration.get("mcp_name", "secon_dbrain")
     if not isinstance(name, str) or not name.strip():
         raise ValueError("integration.mcp_name deve ser um nome não vazio")
-    interpreter = str(Path(python).expanduser().resolve()) if python else str(python_executable(CODE_ROOT))
+    interpreter = str(Path(python).expanduser().absolute()) if python else str(python_executable(CODE_ROOT))
     server = Path(__file__).resolve().parent / "mcp_server.py"
     return name, {
         "command": interpreter,
