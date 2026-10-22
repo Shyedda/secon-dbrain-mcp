@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -7,6 +8,27 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import install_agents
+from common import python_executable
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Unix venv executable symlink")
+def test_detected_python_keeps_virtual_environment_symlink(tmp_path):
+    python = tmp_path / ".venv/bin/python"
+    python.parent.mkdir(parents=True)
+    python.symlink_to(sys.executable)
+    assert python_executable(tmp_path) == python.absolute()
+    assert python_executable(tmp_path) != python.resolve()
+    assert python_executable(tmp_path / "without-venv") == Path(sys.executable).absolute()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Unix venv executable symlink")
+def test_explicit_python_keeps_virtual_environment_symlink(tmp_path):
+    root = make_vault(tmp_path)
+    python = tmp_path / "Other environment/bin/python"
+    python.parent.mkdir(parents=True)
+    python.symlink_to(sys.executable)
+    server = install_agents.generic(root, python)["mcpServers"]["secon_dbrain"]
+    assert server["command"] == str(python.absolute())
 
 
 def make_vault(tmp_path, *, integration=None):

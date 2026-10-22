@@ -6,7 +6,7 @@ O índice é uma forma de recuperação de informação (RAG): no momento de uma
 
 ## Requisitos e instalação
 
-Python 3.12 é necessário. A configuração cria um ambiente virtual próprio em `.venv`, independente dos pacotes Python do sistema. A instalação e validação documentadas foram feitas em Windows com Python 3.12. Linux e macOS podem funcionar, mas ainda não são plataformas validadas por este projeto.
+Python 3.12 é necessário. A configuração cria um ambiente virtual próprio em `.venv`, independente dos pacotes Python do sistema. A suíte automatizada cobre Windows e Ubuntu 24.04 x86_64. Uma validação real em Ubuntu 24.04.2 no WSL2, com Python 3.12.15, verificou PDF, Markdown, embeddings em CPU, MCP STDIO, atualização incremental, lock entre processos e OCR em português/inglês. ARM64 e macOS ainda não foram validados.
 
 Clone o repositório público e entre na pasta:
 
