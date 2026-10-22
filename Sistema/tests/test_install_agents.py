@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import tomlkit
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import install_agents
@@ -111,6 +112,7 @@ def test_codex_allows_python_change_only_for_same_explicit_library(tmp_path, mon
 def test_codex_upgrades_legacy_canonical_registration(tmp_path, monkeypatch):
     root = make_vault(tmp_path)
     monkeypatch.setattr(install_agents, "ROOT", root.resolve())
+    monkeypatch.setattr(install_agents, "CODE_ROOT", root.resolve())
     home = tmp_path / "Legacy Codex Home"
     home.mkdir()
     settings = home / "config.toml"
@@ -129,6 +131,31 @@ def test_codex_upgrades_legacy_canonical_registration(tmp_path, monkeypatch):
 
     parsed = tomlkit.parse(settings.read_text(encoding="utf-8"))
     assert parsed["mcp_servers"]["secon_dbrain"]["args"][-2:] == ["--root", str(root.resolve())]
+
+
+def test_legacy_registration_ignores_dbrain_root_override(tmp_path, monkeypatch):
+    code_root = tmp_path / "Tool"
+    external = make_vault(tmp_path)
+    monkeypatch.setattr(install_agents, "CODE_ROOT", code_root.resolve())
+    monkeypatch.setattr(install_agents, "ROOT", external.resolve())
+    _, desired = install_agents._mcp(external, sys.executable)
+    legacy = {"command": desired["command"], "args": desired["args"][:3]}
+    assert not install_agents._codex_server_matches(legacy, desired, external.resolve())
+    canonical = {**desired, "args": desired["args"][:-1] + [str(code_root.resolve())]}
+    assert install_agents._codex_server_matches(legacy, canonical, code_root.resolve())
+
+
+def test_claude_refuses_legacy_registration_for_environment_root(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    root = make_vault(tmp_path)
+    monkeypatch.setattr(install_agents, "ROOT", root.resolve())
+    monkeypatch.setattr(install_agents, "CODE_ROOT", (tmp_path / "Tool").resolve())
+    monkeypatch.setattr(install_agents, "_claude_cli", lambda: "claude")
+    _, server = install_agents._mcp(root, sys.executable)
+    output = server["command"] + " " + " ".join(server["args"][:3])
+    monkeypatch.setattr(install_agents.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout=output))
+    with pytest.raises(RuntimeError, match="outro comando ou biblioteca"):
+        install_agents.claude(root=root, python=sys.executable)
 
 
 def test_skill_render_failure_does_not_change_codex_config(tmp_path, monkeypatch):

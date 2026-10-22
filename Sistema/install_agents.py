@@ -63,7 +63,7 @@ def _codex_server_matches(existing, server, root):
 
     legacy = ["-X", "utf8", desired[2]]
     return (
-        _same_path(root, ROOT)
+        _same_path(root, CODE_ROOT)
         and args[:2] == legacy[:2]
         and len(args) == 3
         and _same_path(args[2], desired[2])
@@ -210,7 +210,7 @@ def claude(apply=False, root=ROOT, python=None):
         output = current.stdout.lower()
         has_server = str(Path(__file__).resolve().parent / "mcp_server.py").lower() in output
         explicit_root = str(root).lower() in output and "--root" in output
-        legacy_root = _same_path(root, ROOT) and has_server and "--root" not in output
+        legacy_root = _same_path(root, CODE_ROOT) and has_server and "--root" not in output
         if command_value.lower() not in output or not has_server or not (explicit_root or legacy_root):
             raise RuntimeError(f"Já existe {name} no Claude com outro comando ou biblioteca; revise antes de substituir")
     command = [cli, "mcp", "add", name, "--scope", "user", *[x for k, v in server["env"].items() for x in ("-e", f"{k}={v}")], "--", command_value, *server["args"]]
