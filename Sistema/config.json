@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "model": "intfloat/multilingual-e5-small",
+  "chunk_tokens": 400,
+  "overlap_tokens": 40,
+  "embedding_batch": 4,
+  "onnx_threads": 4,
+  "model_max_tokens": 512,
+  "include": [
+    "Documentos",
+    "Notas"
+  ],
+  "pdf_roots": [
+    "Documentos"
+  ],
+  "note_dirs": {
+    "concept": "Notas",
+    "procedure": "Notas",
+    "checklist": "Notas",
+    "tool": "Notas",
+    "experiment": "Notas",
+    "writeup": "Notas",
+    "source": "Notas",
+    "case-study": "Notas"
+  },
+  "template_dir": "90-Templates",
+  "catalog_dir": "Notas/Fontes",
+  "schema_file": "Sistema/schema.json",
+  "lexical_expansions": {},
+  "integration": {
+    "mcp_name": "secon_dbrain",
+    "skill": "Sistema/skill/secon-dbrain/SKILL.md"
+  },
+  "ocr": {
+    "language": "eng+por",
+    "pages": {}
+  }
+}

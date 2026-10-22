@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "types": {
+    "concept": "Ideia atômica e reutilizável, com título em forma de afirmação.",
+    "procedure": "Sequência completa para executar ou verificar algo.",
+    "checklist": "Metodologia de teste, revisão ou recon; itens verificáveis, não atomizados.",
+    "tool": "Uso de uma ferramenta: versão, comandos essenciais, saídas e armadilhas.",
+    "experiment": "Hipótese, ambiente, resultado esperado e observado em laboratório.",
+    "writeup": "Relato de achado em programa autorizado, CTF ou laboratório, com escopo e evidência sanitizada.",
+    "source": "Ficha de livro, curso, artigo ou documentação.",
+    "case-study": "Decisões e evidências de um projeto real.",
+    "guide": "Instrução de uso do próprio vault.",
+    "map": "Mapa de conteúdo (MOC) de uma área.",
+    "book": "PDF indexado (gerado pelo extrator).",
+    "note": "Markdown sem tipo declarado."
+  },
+  "personal_types": ["concept", "procedure", "checklist", "tool", "experiment", "writeup", "case-study"],
+  "areas": {
+    "desenvolvimento": "Desenvolvimento",
+    "arquitetura": "Arquitetura de Segurança",
+    "appsec": "AppSec",
+    "websec": "WebSec",
+    "bugbounty": "Bug Bounty",
+    "offsec": "Offsec",
+    "devsecops": "DevSecOps",
+    "fundamentos-seguranca": "Fundamentos e Defesa"
+  },
+  "status": {
+    "imported": "Incorporado sem revisão de conteúdo.",
+    "needs-review": "Pendente de revisão de conteúdo (padrão para notas criadas por agentes).",
+    "reviewed": "Revisado por humano ou agente delegado pelo usuário; observar responsável, fontes e review_scope. Não atesta execução de testes.",
+    "deprecated": "Mantido para histórico; não usar como referência atual."
+  },
+  "created_by": ["human", "codex", "claude", "import"],
+  "list_fields": ["areas", "aliases", "sources", "tags", "cwe", "owasp", "attack", "capec", "stack"],
+  "patterns": {
+    "cwe": "^CWE-[0-9]{1,4}$",
+    "capec": "^CAPEC-[0-9]{1,4}$",
+    "attack": "^(T[0-9]{4}(\\.[0-9]{3})?|TA[0-9]{4})$",
+    "owasp": "^(A|API|LLM|M|K)[0-9]{1,2}:20[0-9]{2}$",
+    "stack": "^[a-z0-9][a-z0-9.+#-]*$"
+  },
+  "filters": ["areas", "type", "language", "status", "source_id", "created_by", "cwe", "owasp", "attack", "capec", "stack", "tags"]
+}
