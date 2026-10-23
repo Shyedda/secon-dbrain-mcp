@@ -1,43 +1,42 @@
 # Uso
 
-Este guia conduz da cópia do projeto até uma busca local e, se você quiser, à conexão com um cliente de IA. O SecOn Dbrain funciona sem Obsidian e sem MCP; use qualquer editor de texto para criar arquivos Markdown.
+Este guia mostra como preparar uma coleção local de fontes PDF e Markdown, pesquisar as evidências e, opcionalmente, conectar um cliente de IA ou criar resumos derivados. Obsidian e MCP são opcionais; qualquer editor de texto serve para os arquivos Markdown.
 
-## O que a ferramenta faz
+## Pastas e camadas
 
-O trabalho tem duas fases. **Na indexação**, a ferramenta extrai PDF e Markdown, registra metadados e localizadores, divide o texto em trechos de até 400 tokens com sobreposição de até 40 tokens e calcula embeddings com `intfloat/multilingual-e5-small` em CPU via ONNX. Esses vetores multilíngues têm 384 dimensões e são normalizados.
+A distribuição usa esta estrutura:
 
-**Na consulta**, SQLite FTS5 faz a busca lexical BM25, NumPy compara vetores por similaridade de cosseno e a fusão RRF combina as listas de candidatos. A resposta inclui localizadores como página física de PDF ou seção/linhas de Markdown. RAG significa que um cliente de IA pode consultar esses trechos durante a conversa e usá-los como contexto; isso não faz fine-tuning nem treina o modelo com sua coleção. O MCP só lê o índice.
+| Caminho | Papel | Entra na busca? |
+|---|---|---|
+| `PDFs/` | Fontes originais PDF (Bronze) | Sim |
+| `Markdown/` | Fontes originais Markdown (Bronze) | Sim |
+| `Conhecimento/00-Inicio/` | Orientações e mapas da biblioteca | Sim |
+| `Conhecimento/10-Fontes/` | Fichas bibliográficas e estudos de caso | Sim |
+| `Conhecimento/20-Notas/` | Resumos e conceitos derivados | Sim |
+| `Conhecimento/30-Procedimentos/` | Procedimentos e checklists derivados por curadoria | Sim |
+| `Conhecimento/40-Experimentos/` | Sínteses de experimentos documentados nas fontes | Sim |
+| `Conhecimento/90-Templates/` | Templates opcionais | Não |
+| `.dbrain/` | Índice, cache e derivados técnicos regeneráveis (Silver) | Não é fonte |
 
-## 1. Clonar e preparar o ambiente
+Na distribuição genérica, as entradas padrão são `PDFs/` e `Markdown/`. A configuração `input_dirs` define as pastas de fontes de cada biblioteca; em uma cópia privada preexistente, caminhos como `Livros/` podem continuar configurados para PDF. Preserve bytes, nomes e localização dos originais, sem movê-los para corresponder ao exemplo público. Derivados ficam em `knowledge_dir` (padrão `Conhecimento/`). Os guias README têm `rag_exclude: true`; templates nunca entram na busca.
 
-Python 3.12 é necessário. O instalador cria `.venv` dentro da cópia do projeto e instala as dependências sem usar os pacotes Python do sistema.
+A camada **Silver** contém texto extraído, trechos, embeddings, FTS5, índice vetorial, fusão RRF e mapas heurísticos locais baseados em termos, sem afirmar relações semânticas verificadas. São derivados para recuperação e não provam que toda a fonte foi entendida. A camada **Gold** é formada por resumos opcionais e progressivos gerados pelo assistente em tarefas delimitadas, com citações para unidades retornadas. Resumos são Markdown derivado em `Conhecimento/`, com `status: needs-review` até revisão. Não trate nenhum índice ou resumo como garantia de conhecimento completo ou acurácia.
 
-### Windows
+## 1. Instalar (Windows e Ubuntu 24.04)
 
-Instale Git e Python 3.12. Abra PowerShell, confirme a versão e clone o projeto:
+É necessário Python 3.12 e Git. A instalação cria `.venv` dentro da cópia do projeto.
+
+Windows, no PowerShell:
 
 ```powershell
 python --version
 git clone https://github.com/Shyedda/secon-dbrain-mcp.git
 Set-Location secon-dbrain-mcp
 python Sistema/setup_environment.py
+.venv\Scripts\python.exe Sistema/dbrain.py setup-model
 ```
 
-Se `python` apontar para outra versão, ajuste o PATH para Python 3.12 ou informe o executável explicitamente:
-
-```powershell
-python Sistema/setup_environment.py --python 'C:\caminho\para\python.exe'
-```
-
-Use o Python do ambiente do projeto para os comandos seguintes. O wrapper PowerShell `dbrain.ps1` é opcional e não é necessário habilitar a execução de scripts:
-
-```powershell
-.venv\Scripts\python.exe Sistema/dbrain.py status
-```
-
-### Ubuntu 24.04 x86_64
-
-Instale Git, Python 3.12 e o pacote de ambientes virtuais, clone e prepare o ambiente:
+Ubuntu 24.04 x86_64:
 
 ```bash
 sudo apt update
@@ -46,206 +45,119 @@ python3.12 --version
 git clone https://github.com/Shyedda/secon-dbrain-mcp.git
 cd secon-dbrain-mcp
 python3.12 Sistema/setup_environment.py
-.venv/bin/python Sistema/dbrain.py status
-```
-
-Este guia cobre Windows e Ubuntu 24.04 x86_64.
-
-## 2. Baixar o modelo local
-
-Na primeira configuração do índice híbrido, baixe explicitamente o modelo fixado pelo projeto. Este passo precisa de rede:
-
-```powershell
-.venv\Scripts\python.exe Sistema/dbrain.py setup-model
-```
-
-No Ubuntu:
-
-```bash
 .venv/bin/python Sistema/dbrain.py setup-model
 ```
 
-O modelo fica nos dados locais em `.dbrain/`. Depois do download, indexação e busca podem ser feitas localmente, sem conexão à rede. O modo lexical dispensa embeddings e modelo, mas é uma modalidade alternativa explícita para uma coleção nova; não o use para substituir o índice híbrido já criado.
+`setup-model` baixa o modelo fixado pelo projeto e precisa de rede. Depois disso, a preparação híbrida e a busca podem rodar localmente em CPU. O modo `--lexical` não exige embeddings. Use o mesmo modo de índice já escolhido ao preparar atualizações.
 
-## 3. Entender as pastas
+## 2. Adicionar fontes e conhecimento próprio
 
-Na primeira execução, use as pastas abaixo para separar fontes originais, conhecimento próprio e arquivos de suporte. Coloque conteúdo pessoal somente na sua cópia local. O Git ignora o conteúdo do usuário; a distribuição mantém os READMEs de orientação e os oito templates opcionais.
+Coloque os originais nas pastas que aparecem em `Sistema/config.json` em `input_dirs`. No perfil público padrão, use `PDFs/` e `Markdown/`; uma biblioteca já configurada pode continuar usando, por exemplo, `Livros/` para PDF. Não mova originais para encaixá-los no guia. Anotações e derivados pertencem às subpastas de `knowledge_dir` (padrão `Conhecimento/`).
 
-| Pasta | O que guardar | Entra na busca? |
-|---|---|---|
-| `00-Inicio/` | Orientações e mapas próprios em Markdown | Sim |
-| `10-Fontes/` | Fichas bibliográficas e estudos de caso em Markdown; fichas de livros ficam em `10-Fontes/Livros/` | Sim |
-| `20-Notas/` | Conceitos e anotações próprias em Markdown | Sim |
-| `30-Procedimentos/` | Procedimentos, checklists e ferramentas em Markdown | Sim |
-| `40-Experimentos/` | Experimentos e writeups em Markdown | Sim |
-| `Livros/` | Livros em PDF | Sim |
-| `Documentos/` | Manuais, documentações e relatórios em PDF | Sim |
-| `Markdown/` | Documentação de referência original em `.md` | Sim |
-| `Anexos/` | Imagens e evidências | Não |
-| `90-Templates/` | Oito modelos Markdown opcionais para criar notas | Não |
-| `Sistema/` | Código e configuração | Não |
+Exemplo para o perfil público padrão (ajuste o destino para sua configuração local):
 
-Cada pasta tem um README próprio para explicar seu uso. Esses arquivos de orientação são excluídos da indexação por `rag_exclude: true`. Não coloque PDFs dentro das pastas de notas: use `Livros/` ou `Documentos/`. O Obsidian é opcional e pode ajudar a navegar, mas não é necessário para ler ou indexar Markdown.
-
-### Personalizar a coleção (opcional)
-
-Você pode usar a coleção sem editar a configuração. Se quiser mudar a organização, ajuste `Sistema/config.json`:
-
-| Propriedade | Para que serve |
-|---|---|
-| `include` | Pastas que entram na indexação |
-| `pdf_roots` | Pastas onde PDFs são tratados como fontes PDF |
-| `note_dirs` | Pasta associada a cada tipo de nota criado pela CLI |
-| `schema_file` | Caminho do vocabulário de áreas, tipos e metadados |
-
-O esquema geral vem com a área `geral`; use-a ao criar notas próprias. Um perfil opcional de segurança está em `Sistema/profiles/security/schema.json`; para usá-lo, ajuste `schema_file` no arquivo de configuração. Consulte também os demais campos de `Sistema/config.json` antes de personalizar. Na distribuição básica, a configuração já aponta para as pastas apresentadas acima.
-
-## 4. Adicionar arquivos PDF e Markdown
-
-No Windows, crie um arquivo de nota e copie um PDF de exemplo:
+PowerShell:
 
 ```powershell
-New-Item -ItemType Directory -Force 'Documentos' | Out-Null
-Copy-Item 'C:\meus-arquivos\manual.pdf' '.\Documentos\manual.pdf'
-Set-Content '.\20-Notas\meu-resumo.md' "# Meu resumo`n`nAnotações próprias sobre o tema."
+Copy-Item 'C:\meus-arquivos\manual.pdf' '.\PDFs\manual.pdf'
+Set-Content '.\Conhecimento\20-Notas\minha-nota.md' "# Minha nota`n`nSíntese própria com as fontes consultadas."
 ```
 
-No Ubuntu:
+Ubuntu:
 
 ```bash
-mkdir -p Documentos
-cp "$HOME/arquivos/manual.pdf" Documentos/manual.pdf
-cat > 20-Notas/meu-resumo.md <<'EOF'
-# Meu resumo
+cp "$HOME/arquivos/manual.pdf" PDFs/manual.pdf
+cat > Conhecimento/20-Notas/minha-nota.md <<'EOF'
+# Minha nota
 
-Anotações próprias sobre o tema.
+Síntese própria com as fontes consultadas.
 EOF
 ```
 
-Você também pode criar e editar os arquivos no seu editor habitual. Markdown sem frontmatter YAML é aceito. Um frontmatter ajuda a organizar notas, mas não é obrigatório para uma busca básica. Os modelos em `90-Templates/` são opcionais.
+Arquivos em `Conhecimento/90-Templates/` servem para iniciar novas notas, mas não são indexados. Não preencha ou salve conhecimento nessa pasta. A pasta `.dbrain/` guarda dados locais do índice e cache e não deve ser tratada como conteúdo de origem.
 
-Para criar uma nota com a CLI, por exemplo:
+## 3. Preparar e atualizar a busca
 
-```powershell
-.venv\Scripts\python.exe Sistema/dbrain.py new --type concept --title 'Minha ideia' --areas geral --by human
-```
+Use `prepare` para sincronizar alterações nas fontes, atualizar os mapas heurísticos e indexar os derivados elegíveis em `Conhecimento/`. A preparação completa inicial pode demorar; execute em terminal próprio para que o processo possa terminar. A operação incremental de arquivos existentes deve ser preferida em alterações comuns.
 
-No Ubuntu, use `.venv/bin/python` no início do comando. Estes são os tipos e suas pastas padrão:
-
-| Tipo | Pasta |
-|---|---|
-| `source`, `case-study` | `10-Fontes/` |
-| `concept` | `20-Notas/` |
-| `procedure`, `checklist`, `tool` | `30-Procedimentos/` |
-| `experiment`, `writeup` | `40-Experimentos/` |
-
-Os oito templates em `90-Templates/` são opcionais e podem ser usados no editor que preferir; `new` usa o template correspondente ao tipo. A skill `secon-dbrain` também é opcional: ela ensina um agente compatível a consultar e citar a biblioteca. MCP e skill são independentes.
-
-Atualize o índice depois de adicionar ou mudar arquivos:
+Windows:
 
 ```powershell
-.venv\Scripts\python.exe Sistema/dbrain.py update
+.venv\Scripts\python.exe Sistema/dbrain.py prepare --wait 900
+.venv\Scripts\python.exe Sistema/dbrain.py prepare --path 'PDFs/manual.pdf' --wait 900
 ```
 
-No Ubuntu:
+Ubuntu:
 
 ```bash
-.venv/bin/python Sistema/dbrain.py update
+.venv/bin/python Sistema/dbrain.py prepare --wait 900
+.venv/bin/python Sistema/dbrain.py prepare --path 'Markdown/referencia.md' --wait 900
 ```
 
-Para uma mudança pequena, atualize somente o arquivo ou pasta afetada:
+Opções previstas para `prepare`:
 
-```powershell
-.venv\Scripts\python.exe Sistema/dbrain.py update --path 'Documentos/manual.pdf'
-.venv\Scripts\python.exe Sistema/dbrain.py update --path '20-Notas/meu-resumo.md'
-```
+- `--path`: limita a operação a caminho(s) alterados, quando suportado pela CLI.
+- `--lexical`: usa a modalidade lexical sem embeddings. Mantenha a modalidade consistente com o índice existente.
+- `--wait 900`: aguarda até 900 segundos pela trava do escritor; se continuar ocupada, aguarde e tente depois. Nunca apague `writer.lock`.
+- `--by agent`: registra a proveniência operacional do agente que produziu uma escrita. Não representa autoria no Git.
 
-O PDF original permanece no lugar. A indexação gera dados locais em `.dbrain/`; não copie nem versione essa pasta como se fosse conteúdo de origem.
+A CLI também expõe `status`, `check`, `search` e `read` para consultar o estado e conferir evidências. Use a ajuda do comando para os parâmetros específicos. O wrapper PowerShell `dbrain.ps1` pode ser usado no Windows no lugar de `Sistema/dbrain.py`.
 
-## 5. Conferir e buscar
+## 4. Pesquisar e conferir evidências
 
-Confira estado e consistência e faça uma consulta pela CLI:
+Pesquise um tema e leia os trechos retornados antes de responder. Cite o título/origem e a localização fornecida: página física do PDF ou seção/linhas do Markdown. As páginas e localizadores podem se referir à extração; confira afirmações importantes na fonte original, especialmente em PDFs digitalizados, tabelas, colunas, código ou diagramas.
 
-```powershell
-.venv\Scripts\python.exe Sistema/dbrain.py status
-.venv\Scripts\python.exe Sistema/dbrain.py check
-.venv\Scripts\python.exe Sistema/dbrain.py search 'o que a fonte diz sobre o tema'
-```
+A busca híbrida combina recuperação lexical FTS5, similaridade vetorial e fusão RRF. Mapas heuristicamente gerados ajudam a navegar, mas podem deixar de fora ou classificar conteúdo incorretamente. Os resultados são candidatos de recuperação; não constituem prova de exaustividade, correção ou atualidade.
 
-No Ubuntu, use `.venv/bin/python` no início de cada comando. A busca mostra IDs de fonte e localizadores. Leia uma fonte pelo `source_id` apresentado:
+O OCR com Tesseract pode ser habilitado seletivamente nas páginas necessárias, se disponível na instalação. Confira visualmente o resultado OCR e sua citação. Não presuma que OCR recupera todo conteúdo visual.
 
-```powershell
-.venv\Scripts\python.exe Sistema/dbrain.py read 'source-id' --page 1
-```
+## 5. Conectar um cliente por MCP
 
-Substitua `1` por uma página física que exista no PDF. Para Markdown, use somente o ID da fonte, sem `--page`; o resultado de leitura identifica a seção e as linhas. Resultados são sugestões de trechos relevantes, não prova de que uma afirmação esteja correta ou atual. Compare os trechos com a fonte completa e sua versão. PDFs digitalizados ou com tabelas, colunas e imagens podem exigir conferência visual.
+O servidor local usa transporte STDIO. As ferramentas MCP de leitura são `search_knowledge`, `read_knowledge`, `knowledge_status`, `knowledge_overview` e `read_enrichment_task`. A busca e a leitura retornam trechos e localizadores que o agente deve citar.
 
-### OCR opcional para PDFs digitalizados
-
-OCR com Tesseract é opcional. Use-o de forma seletiva: instale Tesseract no sistema, configure em `Sistema/config.json` as páginas físicas do PDF que precisam de OCR e solicite a reextração somente desse arquivo. Por exemplo, para as páginas físicas 3 e 4 de um arquivo chamado `manual-digitalizado.pdf`, a configuração inclui:
-
-```json
-{
-  "ocr": {
-    "language": "eng+por",
-    "pages": {
-      "manual-digitalizado.pdf": [3, 4]
-    }
-  }
-}
-```
-
-Preserve as demais propriedades do arquivo de configuração ao editar esse trecho:
-
-```powershell
-.venv\Scripts\python.exe Sistema/dbrain.py update --path 'Documentos/manual-digitalizado.pdf' --reextract
-```
-
-No Ubuntu, o mesmo comando usa `.venv/bin/python`. As páginas são contadas como páginas físicas do PDF. O OCR pode errar; confira o texto extraído e as citações na imagem da página. Não configure páginas sem necessidade e não presuma que OCR recuperará todo o conteúdo visual.
-
-## 6. Conectar um cliente de IA pelo MCP (opcional)
-
-O servidor MCP roda localmente como processo STDIO, sem servidor HTTP. Ele expõe três ferramentas somente de leitura:
-
-- `search_knowledge`: busca trechos e retorna fonte e localizador.
-- `read_knowledge`: lê o trecho de uma fonte indexada.
-- `knowledge_status`: informa o estado do índice, sem indexar arquivos novos.
-
-Gere a configuração genérica:
+Gere a configuração genérica do cliente (Windows):
 
 ```powershell
 .venv\Scripts\python.exe Sistema/install_agents.py --target generic
 ```
 
-No Ubuntu:
+Para imprimir uma configuração que habilite os escritores, acrescente `--allow-writes`. O instalador não altera o cliente genérico; copie a saída para ele. As integrações específicas também aceitam essa opção quando forem aplicadas.
 
-```bash
-.venv/bin/python Sistema/install_agents.py --target generic
+No Ubuntu, use `.venv/bin/python Sistema/install_agents.py --target generic` (ou acrescente `--allow-writes` para incluir os escritores MCP). Cadastre os valores exibidos nos campos MCP equivalentes do cliente e reinicie a sessão. O formato `mcpServers` é aceito por alguns clientes; outros usam sua própria estrutura de configuração.
+
+A preparação inicial completa pode levar tempo e é melhor executada pela CLI em terminal próprio. `prepare_knowledge(paths?)` é opcional para atualizações menores e só aparece com `--allow-writes`. O instalador genérico aceita `--allow-writes` e imprime a configuração correspondente; sem essa opção, o MCP fica em leitura.
+
+Quando conectado, `read_enrichment_task` é sempre disponível para leitura. `plan_enrichment` e `submit_enrichment` só são registrados com `--allow-writes`, pois criam registros e resumos. Leia a skill `dbrain-enrichment` antes de solicitar essa tarefa. O conteúdo lido pode ser enviado ao provedor de IA escolhido para a conversa.
+
+## 6. Enriquecer por lotes (opcional)
+
+Enriquecimento cria resumos derivados com evidências citadas. Planeje apenas o tema ou as fontes que respondem à necessidade atual; não tente processar a coleção inteira por padrão. Limite o número de tarefas e o orçamento de tokens, leia cada tarefa antes de produzir o resumo e use somente os IDs de citação/unidades retornados naquela tarefa.
+
+CLI:
+
+```text
+dbrain.py enrichment-plan [--query TEMA] [--source-id ID] [--max-tasks 3] [--max-input-tokens 4000]
+dbrain.py enrichment-read TASK_ID
+dbrain.py enrichment-submit TASK_ID --file resumo.json --by agent
 ```
 
-O instalador genérico apenas imprime uma configuração; não altera o cliente. Use um cliente que ofereça suporte a MCP via STDIO e permita que o modelo chame ferramentas. Se o cliente aceitar a estrutura `mcpServers`, copie o JSON gerado. Caso use outro formato, cadastre os mesmos valores de `command`, `args` e `env` nos campos equivalentes do cliente. O JSON aponta para caminhos absolutos desta cópia do projeto; mantenha-a no local e não cole caminhos de outra máquina.
+`max_tasks` aceita de 1 a 10 tarefas. `max_input_tokens` aceita de 1000 a 12000 e estima o orçamento de entrada por tarefa; não é garantia de tokens cobrados pelo provedor. Cada tarefa contém apenas um segmento parcial de uma unidade de uma fonte, não um capítulo completo nem prova de cobertura. Planeje apenas o lote necessário; não processe a biblioteca inteira por padrão.
 
-Após salvar a configuração, reinicie a sessão do cliente para carregar o servidor. Peça ao modelo para pesquisar a coleção, ler os trechos que sustentam a resposta e citar o título da fonte com a página física do PDF ou a seção/linhas do Markdown. Se não houver evidência suficiente na coleção, peça que diga isso. MCP e cliente são componentes separados; instalar ou configurar um não faz todos os modelos ou serviços passarem a consultá-lo automaticamente.
+MCP equivalente, disponível somente com `--allow-writes` para planejamento e envio:
 
-Codex e Claude podem usar o instalador para cadastrar a integração e instalar as instruções e a skill opcional:
-
-```powershell
-.venv\Scripts\python.exe Sistema/install_agents.py --target codex --apply
-.venv\Scripts\python.exe Sistema/install_agents.py --target claude --apply
+```text
+plan_enrichment(query?, source_ids?, max_tasks=3, max_input_tokens=4000)
+read_enrichment_task(task_id)  # leitura disponível mesmo sem --allow-writes
+submit_enrichment(task_id, title, summary, citations: list[int], by='agent')
 ```
 
-Esse passo altera a configuração do cliente selecionado. Sem `--apply`, integrações específicas só são simuladas e relatadas. A configuração genérica não se aplica automaticamente a todos os clientes. `--root` no instalador vem depois do script, por exemplo `Sistema/install_agents.py --target generic --root 'D:\MinhaColecao'`. Para a CLI, `--root` vem antes do subcomando: `Sistema/dbrain.py --root 'D:\MinhaColecao' status`.
+`read_enrichment_task` retorna uma lista `references` com uma única referência identificada como citação `0`. Use essa referência para citar as afirmações sustentadas pelo trecho: o corpo de `summary` deve conter literalmente `[0]` e `citations` precisa ser exatamente `[0]`. O arquivo passado em `--file` é JSON, por exemplo `{"title":"Síntese parcial","summary":"Afirmação limitada ao trecho da fonte [0].","citations":[0]}`. O título deve ter até 200 caracteres em uma linha; o resumo deve ter de 20 a 16000 caracteres.
 
+O envio cria um Markdown derivado em `Conhecimento/20-Notas/`, indexa-o e registra `source_refs` com o hash e os localizadores da fonte. A nota nasce em `needs-review`. A validação verifica a estrutura da citação e a versão da fonte, mas não a fidelidade semântica do resumo. A busca exclui derivados quando detecta mudanças pela versão indexada ou pelo tamanho/data dos arquivos. A leitura de Gold também verifica o hash real da fonte e recusa a síntese se os bytes divergirem. Sempre leia o resultado antes de fundamentar a resposta. Execute `prepare` e planeje uma tarefa nova para fontes alteradas. Não invente fatos, páginas, resultados ou experimentos executados. O fluxo usa trechos no contexto do assistente, não treina o modelo e não faz chamadas a uma API de geração do projeto.
 ## 7. Privacidade e limites
 
-Extração, embeddings, índice e consulta pela CLI são locais. Quando o MCP fornece trechos a um cliente, esses trechos podem ser enviados ao provedor de IA usado naquela conversa; o tratamento depende do cliente e do serviço escolhido. Não indexe credenciais, segredos ou documentos que você não pode compartilhar com esse provedor. Resultados podem estar incompletos, desatualizados ou fora de contexto e não oferecem garantia factual.
+Arquivos originais permanecem sob controle local e devem ser preservados. Índices, embeddings, extrações, cache e outros derivados técnicos ficam em `.dbrain/`; conteúdo privado e dados locais são ignorados pelo Git conforme a configuração da distribuição. Confira `git status` antes de compartilhar uma alteração.
 
-A ferramenta trabalha com PDF e Markdown; não é um leitor geral de EPUB, DOCX, HTML ou páginas web. Ela não faz scraping, fine-tuning nem disponibiliza uma API HTTP.
+Trechos retornados pelo MCP podem ser enviados ao provedor de IA usado na conversa. Não indexe credenciais, segredos ou conteúdo que não possa ser compartilhado com esse serviço. Extração e recuperação têm limites, mapas heurísticos podem errar e resumos opcionais podem omitir contexto. Valide na fonte antes de usar uma afirmação como fato. Nunca registre um experimento como executado sem evidência de que foi realizado.
 
-## Compatibilidade com coleções existentes
-
-Este trecho é para quem já tinha uma coleção antes da estrutura atual. A configuração continua indexando PDFs antigos em `Documentos/`. Uma pasta `Notas/` de uma coleção antiga também pode continuar no escopo de indexação para compatibilidade; novas notas devem ir para `20-Notas/`. Em um clone novo, `Notas/` não é uma pasta de conteúdo distribuída. Preserve arquivos existentes e confira os escopos em `Sistema/config.json` antes de reorganizar uma coleção.
-
-Para outra configuração de coleção, passe `--root` à CLI antes do subcomando. A raiz precisa conter a configuração e os esquemas esperados pelo projeto, além das pastas correspondentes. Uma pasta que contém apenas PDFs não é uma coleção completa.
-
-Volte ao [README](../README.md) do projeto para a visão geral.
+Consulte também o [README](../README.md) e os guias em `Conhecimento/`.

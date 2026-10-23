@@ -27,7 +27,7 @@ def _integration(root):
     return config(root).get("integration", {}) or {}
 
 
-def _mcp(root, python=None):
+def _mcp(root, python=None, allow_writes=False):
     root = Path(root).expanduser().resolve()
     integration = _integration(root)
     name = integration.get("mcp_name", "secon_dbrain")
@@ -37,7 +37,7 @@ def _mcp(root, python=None):
     server = Path(__file__).resolve().parent / "mcp_server.py"
     return name, {
         "command": interpreter,
-        "args": ["-X", "utf8", str(server), "--root", str(root)],
+        "args": ["-X", "utf8", str(server), "--root", str(root)] + (["--allow-writes"] if allow_writes else []),
         "env": ENV.copy(),
     }
 
@@ -57,7 +57,8 @@ def _codex_server_matches(existing, server, root):
         args = list(raw_args)
     except TypeError:
         return False
-    desired = server["args"]
+    args = [arg for arg in args if arg != "--allow-writes"]
+    desired = [arg for arg in server["args"] if arg != "--allow-writes"]
     if len(args) == len(desired):
         return args[:2] == desired[:2] and _same_path(args[2], desired[2]) and args[3:] == desired[3:]
 
@@ -147,14 +148,34 @@ def _backup(root, kind, paths):
     return str(target)
 
 
-def generic(root=ROOT, python=None):
-    name, server = _mcp(root, python)
+def generic(root=ROOT, python=None, allow_writes=False):
+    name, server = _mcp(root, python, allow_writes)
     return {"mcpServers": {name: server}}
 
 
-def codex(apply=False, root=ROOT, python=None):
+def _extra_skills(home, agent, root, apply):
+    result = []
+    for name in ("dbrain-setup", "dbrain-enrichment"):
+        source = Path(root) / "Sistema/skills" / name / "SKILL.md"
+        if not source.exists():
+            source = Path(root) / "Sistema/distribution/skills" / name / "SKILL.md"
+        if not source.exists():
+            continue
+        target = home / "skills" / name / "SKILL.md"
+        _check_skill_owner(target, root)
+        text = source.read_text(encoding="utf-8").replace("{{root}}", str(root)).replace("{{agent}}", agent).replace("{{mcp_name}}", _integration(root).get("mcp_name", "secon_dbrain"))
+        result.append(str(target))
+        if apply:
+            if target.exists():
+                _backup(root, agent + "-skills", {name + ".md": target})
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+    return result
+
+
+def codex(apply=False, root=ROOT, python=None, allow_writes=False):
     root = Path(root).resolve()
-    name, server = _mcp(root, python)
+    name, server = _mcp(root, python, allow_writes)
     home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
     config_path, agents, skill = home / "config.toml", home / "AGENTS.md", home / "skills/secon-dbrain/SKILL.md"
     before = config_path.read_text(encoding="utf-8-sig") if config_path.exists() else ""
@@ -164,7 +185,7 @@ def codex(apply=False, root=ROOT, python=None):
     if existing and not _codex_server_matches(existing, server, root):
         raise RuntimeError(f"Já existe {name} no Codex com outro comando ou biblioteca; nenhuma alteração realizada")
     config_server = tomlkit.table()
-    config_server.update({**server, "startup_timeout_sec": 60, "tool_timeout_sec": 90})
+    config_server.update({**server, "startup_timeout_sec": 60, "tool_timeout_sec": 900 if allow_writes else 90})
     servers[name] = config_server
     after = tomlkit.dumps(document)
     old_parsed, new_parsed = tomllib.loads(before), tomllib.loads(after)
@@ -178,6 +199,7 @@ def codex(apply=False, root=ROOT, python=None):
     _check_skill_owner(skill, root)
     _, agents_after = _merge_block(agents, "codex", root)
     result = {"agent": "codex", "apply": apply, "config": str(config_path), "instructions": str(agents), "skill": str(skill)}
+    _extra_skills(home, "codex", root, False)
     if apply:
         result["backup"] = _backup(root, "codex", {"config.toml": config_path, "AGENTS.md": agents, "SKILL.md": skill})
         config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -187,6 +209,7 @@ def codex(apply=False, root=ROOT, python=None):
         agents.write_text(agents_after, encoding="utf-8")
         skill.parent.mkdir(parents=True, exist_ok=True)
         skill.write_text(skill_content, encoding="utf-8")
+    result["extra_skills"] = _extra_skills(home, "codex", root, apply)
     return result
 
 
@@ -197,9 +220,9 @@ def _claude_cli():
     return exe
 
 
-def claude(apply=False, root=ROOT, python=None):
+def claude(apply=False, root=ROOT, python=None, allow_writes=False):
     root = Path(root).resolve()
-    name, server = _mcp(root, python)
+    name, server = _mcp(root, python, allow_writes)
     home = Path.home() / ".claude"
     instructions, skill = home / "CLAUDE.md", home / "skills/secon-dbrain/SKILL.md"
     cli = _claude_cli()
@@ -213,11 +236,15 @@ def claude(apply=False, root=ROOT, python=None):
         legacy_root = _same_path(root, CODE_ROOT) and has_server and "--root" not in output
         if command_value.lower() not in output or not has_server or not (explicit_root or legacy_root):
             raise RuntimeError(f"Já existe {name} no Claude com outro comando ou biblioteca; revise antes de substituir")
+        current_writes = "--allow-writes" in output
+        if current_writes != allow_writes:
+            raise RuntimeError("O MCP existente do Claude usa outro modo de escrita. Remova somente esse registro com 'claude mcp remove " + name + " --scope user' e repita o instalador; instruções e outros registros serão preservados.")
     command = [cli, "mcp", "add", name, "--scope", "user", *[x for k, v in server["env"].items() for x in ("-e", f"{k}={v}")], "--", command_value, *server["args"]]
     skill_content = _skill_text("claude", root)
     _check_skill_owner(skill, root)
     _, instructions_after = _merge_block(instructions, "claude", root)
     result = {"agent": "claude", "apply": apply, "mcp_registered": registered, "mcp_command": None if registered else command[1:], "instructions": str(instructions), "skill": str(skill), "rollback_mcp": f"claude mcp remove {name} --scope user"}
+    _extra_skills(home, "claude", root, False)
     if apply:
         result["backup"] = _backup(root, "claude", {"CLAUDE.md": instructions, "SKILL.md": skill})
         if not registered:
@@ -228,11 +255,12 @@ def claude(apply=False, root=ROOT, python=None):
         instructions.write_text(instructions_after, encoding="utf-8")
         skill.parent.mkdir(parents=True, exist_ok=True)
         skill.write_text(skill_content, encoding="utf-8")
+    result["extra_skills"] = _extra_skills(home, "claude", root, apply)
     return result
 
 
-def install(targets, apply=False, root=ROOT, python=None):
-    results = [{"codex": codex, "claude": claude}[target](apply, root, python) for target in targets]
+def install(targets, apply=False, root=ROOT, python=None, allow_writes=False):
+    results = [{"codex": codex, "claude": claude}[target](apply, root, python, allow_writes) for target in targets]
     if apply:
         save_json(Path(root) / ".dbrain/agents-install.json", {"time": now(), "results": results})
     return results
@@ -244,10 +272,11 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--python", help="Executável Python preferido para o MCP")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--allow-writes", action="store_true", help="Habilitar ferramentas MCP de preparação e síntese")
     args = parser.parse_args()
     if args.target == "generic":
-        output = generic(args.root, args.python)
+        output = generic(args.root, args.python, args.allow_writes)
     else:
         targets = ["codex", "claude"] if args.target == "all" else [args.target]
-        output = install(targets, args.apply, args.root, args.python)
+        output = install(targets, args.apply, args.root, args.python, args.allow_writes)
     print(json.dumps(output, ensure_ascii=False, indent=2))

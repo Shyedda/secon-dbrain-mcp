@@ -1,10 +1,10 @@
 ---
 rag_exclude: true
 ---
-# Markdown
+# Fontes em Markdown
 
-Use para documentação de referência original em Markdown (`.md`).
-Mantenha esse material separado de conceitos, resumos e anotações próprias.
-Preserve a extensão e a autoria do conteúdo de referência.
-Os arquivos Markdown desta pasta são indexados; PDFs aqui não entram no índice.
-Veja o [roteiro da biblioteca](../README.md).
+Adicione aqui qualquer arquivo `.md`: suas anotações de estudo, livros em Markdown, documentação técnica, artigos ou registros de experimentos. Subpastas são permitidas. O projeto lê e indexa os arquivos sem sobrescrever seu conteúdo ou sua autoria.
+
+Depois de adicionar ou editar um arquivo, execute `prepare`. Mapas, fichas e resumos do processamento ficam em `Conhecimento/`; você não precisa distribuir suas anotações entre essas categorias.
+
+Veja o [roteiro da biblioteca](../README.md) e o [guia de uso](../docs/usage.md).

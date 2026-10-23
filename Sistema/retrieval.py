@@ -32,6 +32,8 @@ class Knowledge:
     def _weight(self, meta):
         """Own synthesized notes outrank raw book pages at similar relevance; deprecated ones sink."""
         weight = 1.0
+        if meta.get("generated_by_pipeline"):
+            return 1.0 if meta.get("status") == "reviewed" else 0.8
         if meta.get("type") in self.vocabulary["personal_types"]:
             weight *= 1.3
             if meta.get("status") == "reviewed":
@@ -76,7 +78,9 @@ class Knowledge:
         db = readonly_db(directory / "knowledge.sqlite")
         try:
             docs = {r["id"]: {"metadata": json.loads(r["metadata"]), "paths": json.loads(r["paths"]), "sha": r["sha"]} for r in db.execute("SELECT * FROM documents")}
-            allowed = {sid for sid, d in docs.items() if self._matches(d["metadata"], sid, filters)}
+            from knowledge_pipeline import derivative_state
+            derived_states = {sid: derivative_state(self.root, d["metadata"], manifest) for sid, d in docs.items()}
+            allowed = {sid for sid, d in docs.items() if self._matches(d["metadata"], sid, filters) and not derived_states[sid]["stale"]}
             if not allowed:
                 return {"generation": directory.name, "mode": "lexical", "results": [], "notice": "Nenhuma fonte corresponde aos filtros."}
             tokens = [t for t in re.findall(r"[\w]+(?:[-_.][\w]+)*", query.lower()) if t not in STOP]
@@ -141,6 +145,7 @@ class Knowledge:
                 record = manifest["files"][path]
                 stale = self._changed(path, record)
                 results.append({"source_id": sid, "chunk_id": row["id"], "title": document["metadata"]["title"], "type": document["metadata"].get("type"), "status": document["metadata"].get("status"), "created_by": document["metadata"].get("created_by"), "path": str(self.root / path), "all_paths": document["paths"], "section": row["section"], "locator": {**locator, "chunk_id": row["id"], "generation": directory.name}, "source_sha256": document["sha"], "excerpt": row["text"][:2200], "excerpt_truncated": len(row["text"]) > 2200, "score_rrf": round(score, 6), "semantic_similarity": similarities.get(rowid), "source_changed_since_index": stale})
+                results[-1]["derivation"] = derived_states[sid]
                 if len(results) >= limit:
                     break
             return {"generation": directory.name, "mode": mode, "warning": warning, "elapsed_ms": round(1000*(time.monotonic()-start), 1), "notice": "Resultados são candidatos a evidência, não uma resposta validada. Confirme o trecho com read_knowledge e declare ausência de cobertura quando não sustentar a pergunta.", "results": results}
@@ -185,6 +190,10 @@ class Knowledge:
             if not document:
                 raise ValueError("Fonte não cadastrada nesta geração")
             metadata = json.loads(document["metadata"])
+            from knowledge_pipeline import derivative_state
+            derived = derivative_state(self.root, metadata, manifest, verify=metadata.get("layer") == "gold")
+            if derived["stale"]:
+                raise ValueError("Derivado desatualizado: consulte a fonte original e execute prepare/enriquecimento novamente")
             paths = json.loads(document["paths"])
             cache_path = (self.root / document["cache"]).resolve()
             if not cache_path.is_relative_to(self.root / ".dbrain/extractions"):
