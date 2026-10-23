@@ -1,87 +1,85 @@
 # SecOn Dbrain
 
-SecOn Dbrain mantém um índice local de PDFs e arquivos Markdown para você pesquisar sua coleção. O RAG (geração aumentada por recuperação) encontra trechos relevantes durante a pergunta e pode fornecê-los como contexto a uma IA; isso não treina nem ajusta o modelo. A CLI permite usar a coleção sem IA.
+SecOn Dbrain transforma seus livros, documentações técnicas e anotações em uma biblioteca RAG local acessível por MCP. Adicione PDFs e Markdown, prepare a base no seu computador e peça ao assistente de IA para consultar os trechos relevantes com referências às fontes. A preparação local dispensa tokens de um provedor de IA; a conversa e os resumos opcionais usam o modelo escolhido por você.
 
-## Onde guardar cada conteúdo
+## Pastas da coleção
 
-Os READMEs de cada pasta explicam como usá-la. PDFs e arquivos pessoais são adicionados apenas à sua cópia local.
+O perfil público mantém duas áreas de entrada para fontes: `PDFs/` e `Markdown/`. Preserve os arquivos originais, seus nomes e sua localização. Notas, mapas, procedimentos, experimentos e resumos derivados ficam em `Conhecimento/`.
 
-| Pasta | O que guardar | Busca |
+| Pasta | Conteúdo | Busca |
 |---|---|---|
-| [00-Inicio](00-Inicio/README.md) | Orientações e mapas próprios em Markdown | Sim |
-| [10-Fontes](10-Fontes/README.md) | Fichas bibliográficas e estudos de caso em Markdown | Sim |
-| [20-Notas](20-Notas/README.md) | Conceitos e anotações próprias em Markdown | Sim |
-| [30-Procedimentos](30-Procedimentos/README.md) | Procedimentos, checklists e ferramentas em Markdown | Sim |
-| [40-Experimentos](40-Experimentos/README.md) | Experimentos e writeups em Markdown | Sim |
-| [Livros](Livros/README.md) | Livros em PDF | Sim |
-| [Documentos](Documentos/README.md) | Manuais, documentações e relatórios em PDF | Sim |
-| [Markdown](Markdown/README.md) | Documentação de referência original em `.md` | Sim |
-| [Anexos](Anexos/README.md) | Imagens e evidências | Não |
-| [90-Templates](90-Templates/README.md) | Oito templates opcionais para novas notas | Não |
-| [Sistema](Sistema/README.md) | Código e configuração | Não |
+| `PDFs/` | Fontes originais em PDF | Sim |
+| `Markdown/` | Fontes originais em Markdown | Sim |
+| `Conhecimento/00-Inicio/` | Orientações e mapas locais | Sim |
+| `Conhecimento/10-Fontes/` | Fichas bibliográficas e estudos de caso | Sim |
+| `Conhecimento/20-Notas/` | Resumos e conceitos derivados das fontes | Sim |
+| `Conhecimento/30-Procedimentos/` | Procedimentos e checklists derivados, quando pertinentes | Sim |
+| `Conhecimento/40-Experimentos/` | Sínteses de experimentos já documentados nas fontes | Sim |
+| `Conhecimento/90-Templates/` | Modelos para novas notas | Não |
+| `.dbrain/` | Índice, cache e dados derivados regeneráveis | Não é fonte |
 
-Fichas bibliográficas de livros ficam em [10-Fontes/Livros/](10-Fontes/Livros/README.md). Os READMEs de orientação têm `rag_exclude: true`; anexos, templates e Sistema não são indexados.
+Templates não são indexados. Os guias README explicam cada pasta e também são excluídos da busca. Esta é a configuração padrão da distribuição; bibliotecas privadas devem manter os caminhos de fonte em `Sistema/config.json` (`input_dirs`). Uma entrada PDF existente como `Livros/` pode continuar em uso: não mova os originais para corresponder ao exemplo público.
+
+Para o uso comum, adicione material somente nas duas entradas. `prepare` gera fichas e mapas locais; o enriquecimento opcional grava resumos em `Conhecimento/20-Notas/`. As demais categorias permitem curadoria avançada, mas não recebem procedimentos ou experimentos inventados automaticamente.
+
+## Como as camadas funcionam
+
+- **Bronze:** PDFs e Markdown originais preservados.
+- **Silver:** texto extraído, trechos, embeddings, índice lexical FTS5 e vetorial, fusão RRF e mapas heurísticos locais baseados em termos, sem afirmar relações semânticas verificadas. Esses dados ficam em `.dbrain/` e podem ser reconstruídos a partir das fontes e da configuração.
+- **Gold:** resumos opcionais e progressivos, preparados pelo assistente a partir de tarefas de enriquecimento e gravados em `Conhecimento/`. Cada resumo deve citar as unidades de evidência fornecidas, como páginas físicas ou seções. Ele começa como rascunho `needs-review`.
+
+A busca híbrida combina BM25 (palavras-chave, via SQLite FTS5) e similaridade entre embeddings locais (busca semântica), ordenando os resultados por fusão RRF. O modelo recebe trechos selecionados por pergunta. Sínteses ajudam a navegação e não substituem a recuperação do texto original. Mapas e fichas locais recebem versões de conteúdo; versões antigas continuam preservadas e deixam de ser recuperadas quando suas referências ficam obsoletas.
+
+O assistente pode produzir resumos por meio das ferramentas MCP de enriquecimento, se o servidor tiver escrita opt-in habilitada. Esse fluxo usa os trechos recuperados no contexto da conversa; não adiciona uma API de modelo ao SecOn Dbrain. O provedor de IA da conversa pode receber os trechos usados na tarefa.
 
 ## Início rápido
 
-O projeto requer Python 3.12 e Git. Ele separa a indexação da consulta: durante a indexação, extrai texto, registra metadados e localizadores, divide o conteúdo em trechos de até 400 tokens com sobreposição de até 40 tokens e calcula embeddings em CPU via ONNX. Durante a consulta, combina BM25 com SQLite FTS5 e busca vetorial por cosseno em NumPy; a fusão RRF ordena candidatos. O MCP só lê o índice e não atualiza documentos.
+Requer Python 3.12 e Git. O guia [Uso](docs/usage.md) descreve instalação para Windows e Ubuntu 24.04, preparação, busca e integração opcional com MCP.
 
 ### Windows
 
-Instale Git e Python 3.12, com Python disponível no PATH. No PowerShell, clone e prepare o ambiente:
-
 ```powershell
-python --version
 git clone https://github.com/Shyedda/secon-dbrain-mcp.git
 Set-Location secon-dbrain-mcp
 python Sistema/setup_environment.py
 .venv\Scripts\python.exe Sistema/dbrain.py setup-model
 ```
 
-Agora copie seus PDFs para `Livros/` ou `Documentos/` e seus Markdown para as pastas da tabela acima. Depois de adicionar arquivos, indexe e pesquise:
+Copie fontes para `PDFs/` ou `Markdown/` e prepare o índice. A preparação inicial pode levar tempo; execute-a em um terminal próprio.
 
 ```powershell
-.venv\Scripts\python.exe Sistema/dbrain.py update
-.venv\Scripts\python.exe Sistema/dbrain.py status
-.venv\Scripts\python.exe Sistema/dbrain.py search 'sua pergunta ou tema'
+.venv\Scripts\python.exe Sistema/dbrain.py prepare --wait 900
+.venv\Scripts\python.exe Sistema/dbrain.py search 'tema ou pergunta'
 ```
 
 ### Ubuntu 24.04 x86_64
 
-No terminal, instale Git, Python 3.12 e o suporte a ambientes virtuais, depois clone e prepare o ambiente:
-
 ```bash
 sudo apt update
 sudo apt install git python3.12 python3.12-venv
-python3.12 --version
 git clone https://github.com/Shyedda/secon-dbrain-mcp.git
 cd secon-dbrain-mcp
 python3.12 Sistema/setup_environment.py
 .venv/bin/python Sistema/dbrain.py setup-model
 ```
 
-Agora copie seus PDFs para `Livros/` ou `Documentos/` e seus Markdown para as pastas da tabela acima. Depois de adicionar arquivos, indexe e pesquise:
+Depois de copiar fontes para `PDFs/` ou `Markdown/`:
 
 ```bash
-.venv/bin/python Sistema/dbrain.py update
-.venv/bin/python Sistema/dbrain.py status
-.venv/bin/python Sistema/dbrain.py search 'sua pergunta ou tema'
+.venv/bin/python Sistema/dbrain.py prepare --wait 900
+.venv/bin/python Sistema/dbrain.py search 'tema ou pergunta'
 ```
 
-`setup-model` baixa o modelo de embeddings fixado pelo projeto e precisa de rede. Após o download, indexação e busca rodam localmente em CPU. O wrapper `dbrain.ps1` é opcional no Windows. O guia [Uso](docs/usage.md) contém exemplos de criação de notas e a configuração completa do MCP.
+O download inicial do modelo requer rede. Depois disso, processamento e busca ocorrem localmente. `--lexical` seleciona preparação lexical sem embeddings; escolha esse modo para um índice lexical deliberado, não para trocar silenciosamente o modo de um índice existente.
 
-## MCP e cliente de IA
+## Agentes e MCP
 
-O MCP local oferece `search_knowledge`, `read_knowledge` e `knowledge_status`, ferramentas somente de leitura. Usa transporte STDIO e não inicia servidor HTTP. Para gerar uma configuração genérica, execute:
+O MCP oferece `search_knowledge`, `read_knowledge`, `knowledge_status`, `knowledge_overview` e `read_enrichment_task` em modo de leitura. `prepare_knowledge`, `plan_enrichment` e `submit_enrichment` são escritores ativados com `--allow-writes`; o instalador pode gerar essa configuração com a mesma opção. A CLI `prepare` é preferível para a preparação inicial, que pode demorar.
 
-```powershell
-.venv\Scripts\python.exe Sistema/install_agents.py --target generic
-```
-
-No Ubuntu, use `.venv/bin/python Sistema/install_agents.py --target generic`. O instalador apenas imprime um JSON de exemplo; ele não altera o cliente. Copie o objeto `mcpServers` apenas em clientes que aceitam esse formato. Nos outros, cadastre os mesmos valores de `command`, `args` e `env` na estrutura própria do cliente. Reinicie a sessão para carregar o servidor e peça à IA para pesquisar, ler os trechos e citar a página física do PDF ou a seção/linhas do Markdown. Integrações opcionais com Codex e Claude podem ser aplicadas pelo instalador com `--target codex --apply` ou `--target claude --apply`.
+As skills empacotadas `dbrain-setup` e `dbrain-enrichment` orientam, respectivamente, a configuração e o enriquecimento por lotes. Consulte [Uso](docs/usage.md) para os nomes e parâmetros disponíveis.
 
 ## Evidência e privacidade
 
-Resultados são candidatos de busca, não respostas verificadas. Confira afirmações importantes na fonte original. Extração de PDFs pode perder estrutura; OCR com Tesseract é opcional, seletivo e requer revisão. Trechos enviados pelo MCP podem chegar ao provedor de IA escolhido para a conversa. Não indexe segredos nem material que não possa ser enviado a esse serviço.
+Resultados são candidatos de recuperação. Verifique afirmações importantes nas fontes originais e cite a fonte com a página física do PDF ou seção/linhas do Markdown. Extração pode perder estrutura ou conteúdo, e mapas heurísticos podem errar. Não invente resultados de experimentos. Resumos não substituem as fontes e devem permanecer em revisão até serem conferidos.
 
-Obsidian é opcional; qualquer editor compatível com Markdown serve. Consulte [licença](LICENSE), [contribuições](CONTRIBUTING.md) e [segurança](SECURITY.md).
+O processamento local não envia automaticamente toda a coleção. Trechos fornecidos ao MCP podem chegar ao provedor de IA escolhido para a conversa. Não indexe segredos nem material que não possa ser compartilhado com esse serviço.

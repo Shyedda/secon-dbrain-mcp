@@ -7,32 +7,34 @@
   "onnx_threads": 4,
   "model_max_tokens": 512,
   "include": [
-    "00-Inicio",
-    "10-Fontes",
-    "20-Notas",
-    "30-Procedimentos",
-    "40-Experimentos",
-    "Livros",
-    "Documentos",
+    "PDFs",
     "Markdown",
-    "Notas"
+    "Conhecimento/00-Inicio",
+    "Conhecimento/10-Fontes",
+    "Conhecimento/20-Notas",
+    "Conhecimento/30-Procedimentos",
+    "Conhecimento/40-Experimentos"
   ],
   "pdf_roots": [
-    "Livros",
-    "Documentos"
+    "PDFs"
   ],
-  "note_dirs": {
-    "concept": "20-Notas",
-    "procedure": "30-Procedimentos",
-    "checklist": "30-Procedimentos",
-    "tool": "30-Procedimentos",
-    "experiment": "40-Experimentos",
-    "writeup": "40-Experimentos",
-    "source": "10-Fontes",
-    "case-study": "10-Fontes"
+  "input_dirs": {
+    "pdf": "PDFs",
+    "markdown": "Markdown"
   },
-  "template_dir": "90-Templates",
-  "catalog_dir": "10-Fontes/Livros",
+  "knowledge_dir": "Conhecimento",
+  "note_dirs": {
+    "concept": "Conhecimento/20-Notas",
+    "procedure": "Conhecimento/30-Procedimentos",
+    "checklist": "Conhecimento/30-Procedimentos",
+    "tool": "Conhecimento/30-Procedimentos",
+    "experiment": "Conhecimento/40-Experimentos",
+    "writeup": "Conhecimento/40-Experimentos",
+    "source": "Conhecimento/10-Fontes",
+    "case-study": "Conhecimento/10-Fontes"
+  },
+  "template_dir": "Conhecimento/90-Templates",
+  "catalog_dir": "Conhecimento/10-Fontes/Livros",
   "schema_file": "Sistema/schema.json",
   "lexical_expansions": {},
   "integration": {
