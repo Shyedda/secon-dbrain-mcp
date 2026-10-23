@@ -30,4 +30,4 @@ Resuma o conteúdo com contexto e localizadores para as passagens relevantes.
 
 ## Conhecimento relacionado
 
-Vincule as notas relacionadas da pasta `Notas/`.
+Vincule as notas relacionadas da pasta `20-Notas/`.

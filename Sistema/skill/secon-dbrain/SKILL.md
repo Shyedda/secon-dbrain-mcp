@@ -26,7 +26,7 @@ Extração e índice são locais. Trechos retornados pelo MCP podem entrar no co
 
 ## Tipos de fonte e limites
 
-O perfil genérico indexa PDFs em `Documentos/` e Markdown em `Notas/`. A extração de PDF pode falhar em páginas digitalizadas, colunas, tabelas, imagens ou código. OCR seletivo com Tesseract é opcional e deve ser conferido visualmente. EPUB, DOCX, HTML, scraping genérico e API HTTP não são suportados.
+O perfil genérico indexa PDFs em `Livros/` e `Documentos/`. Documentação de referência em Markdown fica em `Markdown/`; fichas em `10-Fontes/`, notas próprias em `20-Notas/`, procedimentos em `30-Procedimentos/`, experimentos em `40-Experimentos/` e mapas em `00-Inicio/`. Os guias README dessas pastas têm `rag_exclude: true` e não viram conhecimento. `Anexos/`, `90-Templates/` e `Sistema/` não são indexados. `Notas/` continua aceito em coleções de versões anteriores. A extração de PDF pode falhar em páginas digitalizadas, colunas, tabelas, imagens ou código. OCR seletivo com Tesseract é opcional e deve ser conferido visualmente. EPUB, DOCX, HTML, scraping genérico e API HTTP não são suportados.
 
 ## Comandos locais
 

@@ -7,24 +7,32 @@
   "onnx_threads": 4,
   "model_max_tokens": 512,
   "include": [
+    "00-Inicio",
+    "10-Fontes",
+    "20-Notas",
+    "30-Procedimentos",
+    "40-Experimentos",
+    "Livros",
     "Documentos",
+    "Markdown",
     "Notas"
   ],
   "pdf_roots": [
+    "Livros",
     "Documentos"
   ],
   "note_dirs": {
-    "concept": "Notas",
-    "procedure": "Notas",
-    "checklist": "Notas",
-    "tool": "Notas",
-    "experiment": "Notas",
-    "writeup": "Notas",
-    "source": "Notas",
-    "case-study": "Notas"
+    "concept": "20-Notas",
+    "procedure": "30-Procedimentos",
+    "checklist": "30-Procedimentos",
+    "tool": "30-Procedimentos",
+    "experiment": "40-Experimentos",
+    "writeup": "40-Experimentos",
+    "source": "10-Fontes",
+    "case-study": "10-Fontes"
   },
   "template_dir": "90-Templates",
-  "catalog_dir": "Notas/Fontes",
+  "catalog_dir": "10-Fontes/Livros",
   "schema_file": "Sistema/schema.json",
   "lexical_expansions": {},
   "integration": {

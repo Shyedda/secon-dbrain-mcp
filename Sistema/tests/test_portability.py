@@ -8,7 +8,7 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import config, eligible, note_dirs, save_json, schema
+from common import NOTE_DIRS, config, eligible, file_hash, note_dirs, save_json, schema
 from dbrain import new_note
 from indexer import update
 from retrieval import Knowledge
@@ -95,3 +95,80 @@ def test_setup_rejects_codex_cache(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: SimpleNamespace(stdout=json.dumps({"version": [3, 12, 14], "base": "C:/cache/codex-runtimes/python", "executable": "python"})))
     with pytest.raises(ValueError, match="Codex"):
         inspect_python("python")
+
+
+def test_structured_library_indexes_pdfs_and_markdown_without_its_guides(portable):
+    """The shipped layout works with real PDFs and plain Markdown, without editing either."""
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    folders = ["00-Inicio", "10-Fontes", "20-Notas", "30-Procedimentos", "40-Experimentos", "Livros", "Documentos", "Markdown"]
+    cfg = config(portable)
+    cfg.update(include=[*folders, "Notas"], pdf_roots=["Livros", "Documentos"], note_dirs=NOTE_DIRS.copy())
+    save_json(portable / "Sistema/config.json", cfg)
+    originals = {}
+    for index, folder in enumerate(folders):
+        directory = portable / folder
+        directory.mkdir(exist_ok=True)
+        (directory / "README.md").write_text('---\nrag_exclude: true\n---\n# GUIDE_EXCLUDED_MARKER\n', encoding="utf-8")
+        if folder in cfg["pdf_roots"]:
+            path = directory / "synthetic.pdf"
+            writer = PdfWriter()
+            page = writer.add_blank_page(width=400, height=300)
+            font = DictionaryObject({NameObject('/Type'): NameObject('/Font'), NameObject('/Subtype'): NameObject('/Type1'), NameObject('/BaseFont'): NameObject('/Helvetica')})
+            page[NameObject('/Resources')] = DictionaryObject({NameObject('/Font'): DictionaryObject({NameObject('/F1'): font})})
+            stream = DecodedStreamObject()
+            stream.set_data(f'BT /F1 12 Tf 40 220 Td (PUBLIC_PDF_MARKER_{index} describes a synthetic manual for testing.) Tj ET'.encode())
+            page[NameObject('/Contents')] = writer._add_object(stream)
+            with path.open('wb') as output:
+                writer.write(output)
+            # Markdown inside a PDF root is deliberately not a source.
+            (directory / "wrong-format.md").write_text('WRONG_LOCATION_MARKER', encoding="utf-8")
+        else:
+            path = directory / "ação.md"
+            path.write_text(f'# Synthetic section\n\nPUBLIC_MD_MARKER_{index} is a reference written for testing.\n', encoding="utf-8")
+        originals[path] = file_hash(path)
+    # Existing clones can keep their old notes without moving them.
+    legacy = portable / 'Notas/legacy.md'
+    legacy.write_text('# Legacy section\n\nLEGACY_NOTE_MARKER remains queryable.\n', encoding='utf-8')
+    originals[legacy] = file_hash(legacy)
+    for folder in ('Anexos', '90-Templates', 'Sistema'):
+        (portable / folder).mkdir(exist_ok=True)
+        (portable / folder / 'not-knowledge.md').write_text('OUT_OF_SCOPE_MARKER', encoding='utf-8')
+    assert eligible(portable, portable / 'Livros/synthetic.pdf', cfg)
+    assert eligible(portable, portable / 'Documentos/synthetic.pdf', cfg)
+    assert eligible(portable, portable / 'Markdown/ação.md', cfg)
+    assert not eligible(portable, portable / 'Markdown/ignored.pdf', cfg)
+    result = update(portable, lexical=True)
+    assert result['documents'] == len(originals)
+    knowledge = Knowledge(portable)
+    assert knowledge.status()['pdf_files'] == 2
+    assert not knowledge.search('GUIDE_EXCLUDED_MARKER')['results']
+    assert not knowledge.search('WRONG_LOCATION_MARKER')['results']
+    assert not knowledge.search('OUT_OF_SCOPE_MARKER')['results']
+    for index, folder in enumerate(folders):
+        marker = f'PUBLIC_PDF_MARKER_{index}' if folder in cfg['pdf_roots'] else f'PUBLIC_MD_MARKER_{index}'
+        hit = knowledge.search(marker)['results'][0]
+        assert hit['all_paths'] == [f'{folder}/synthetic.pdf' if folder in cfg['pdf_roots'] else f'{folder}/ação.md']
+        reading = knowledge.read(hit['source_id'], hit['locator'])
+        assert marker in reading['text']
+        if folder in cfg['pdf_roots']:
+            assert reading['locator']['pdf_page'] == 1
+    assert knowledge.search('LEGACY_NOTE_MARKER')['results']
+    noop = update(portable, lexical=True)
+    assert noop['content_reads'] == noop['new_embeddings'] == 0
+    assert {path: file_hash(path) for path in originals} == originals
+
+
+@pytest.mark.parametrize('kind,folder', NOTE_DIRS.items())
+def test_structured_library_creates_notes_in_the_matching_folder(portable, kind, folder):
+    system = Path(__file__).resolve().parents[1]
+    source = system / 'distribution/templates' / (kind + '.md')
+    if not source.exists():
+        source = system.parent / '90-Templates' / (kind + '.md')
+    (portable / '90-Templates' / (kind + '.md')).write_text(source.read_text(encoding='utf-8'), encoding='utf-8')
+    cfg = config(portable)
+    cfg['note_dirs'] = NOTE_DIRS.copy()
+    save_json(portable / 'Sistema/config.json', cfg)
+    created = new_note(portable, kind, f'Synthetic {kind}', by='human')
+    assert Path(created['created']).parent == portable / folder
