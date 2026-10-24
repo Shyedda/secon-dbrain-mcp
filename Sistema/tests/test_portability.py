@@ -20,13 +20,13 @@ def portable(tmp_path):
     root = tmp_path / "Coleção independente com espaços"
     system = Path(__file__).resolve().parents[1]
     cfg = json.loads((system / "config.json").read_text(encoding="utf-8"))
-    cfg.update(include=["Documentos", "Notas"], pdf_roots=["Documentos"],
+    cfg.update(include=["Documentos", "Notas"], pdf_roots=["Documentos"], template_dir="90-Templates",
                note_dirs={kind: "Notas" for kind in note_dirs(system.parent)},
                catalog_dir="Notas/Fontes", lexical_expansions={})
     save_json(root / "Sistema/config.json", cfg)
     save_json(root / "Sistema/schema.json", schema(system.parent))
     (root / "90-Templates").mkdir()
-    (root / "90-Templates/concept.md").write_text((system.parent / "90-Templates/concept.md").read_text(encoding="utf-8"), encoding="utf-8")
+    (root / "90-Templates/concept.md").write_text((system.parent / config(system.parent).get("template_dir", "90-Templates") / "concept.md").read_text(encoding="utf-8"), encoding="utf-8")
     (root / "Documentos").mkdir()
     (root / "Notas").mkdir()
     return root
@@ -80,7 +80,7 @@ def test_mcp_reads_only_the_selected_library(portable, tmp_path):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 tools = await session.list_tools()
-                assert sorted(t.name for t in tools.tools) == ["knowledge_status", "read_knowledge", "search_knowledge"]
+                assert sorted(t.name for t in tools.tools) == ["knowledge_overview", "knowledge_status", "read_enrichment_task", "read_knowledge", "search_knowledge"]
                 status = data(await session.call_tool("knowledge_status", {}))
                 assert status["documents"] == 1
                 answer = data(await session.call_tool("search_knowledge", {"query": "MARCADOR_COLECAO_ISOLADA"}))
@@ -165,7 +165,7 @@ def test_structured_library_creates_notes_in_the_matching_folder(portable, kind,
     system = Path(__file__).resolve().parents[1]
     source = system / 'distribution/templates' / (kind + '.md')
     if not source.exists():
-        source = system.parent / '90-Templates' / (kind + '.md')
+        source = system.parent / config(system.parent).get('template_dir', '90-Templates') / (kind + '.md')
     (portable / '90-Templates' / (kind + '.md')).write_text(source.read_text(encoding='utf-8'), encoding='utf-8')
     cfg = config(portable)
     cfg['note_dirs'] = NOTE_DIRS.copy()

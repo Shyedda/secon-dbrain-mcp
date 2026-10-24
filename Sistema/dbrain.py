@@ -120,7 +120,8 @@ def check(root, originals=False):
             sid = extracted.get("source_id")
             if sid and sid in ids:
                 result["errors"].append(f"ID duplicado: {path} e {ids[sid]}")
-            ids[sid] = path
+            if sid:
+                ids[sid] = path
             text = path.read_text(encoding="utf-8-sig")
             for link in re.findall(r"\[\[([^\]]+)\]\]", text):
                 target = link.split("|", 1)[0].split("#", 1)[0]
@@ -227,10 +228,46 @@ def main():
     p.add_argument("--keep", type=int, default=3, help="Gerações publicadas recentes a manter além da atual")
     p.add_argument("--apply", action="store_true")
     subs.add_parser("setup-model", help="Baixar explicitamente o modelo fixado")
-    subs.add_parser("mcp", help="Servidor STDIO somente de consulta")
+    p = subs.add_parser("mcp", help="Servidor STDIO; escrita de derivados é opt-in")
+    p.add_argument("--allow-writes", action="store_true")
+    p = subs.add_parser("prepare", help="Preparar fontes e mapas localmente, sem chamadas a provedor")
+    p.add_argument("--path", action="append")
+    p.add_argument("--lexical", action="store_true")
+    p.add_argument("--wait", type=int, default=0)
+    p.add_argument("--by")
+    p = subs.add_parser("enrichment-plan", help="Planejar pequeno lote de sínteses para seu assistente")
+    p.add_argument("--query")
+    p.add_argument("--source-id", action="append")
+    p.add_argument("--max-tasks", type=int, default=3)
+    p.add_argument("--max-input-tokens", type=int, default=4000)
+    p.add_argument("--by")
+    p = subs.add_parser("enrichment-read", help="Ler um trecho limitado e as instruções de síntese")
+    p.add_argument("task_id")
+    p = subs.add_parser("enrichment-submit", help="Receber JSON title/summary/citations e indexar a síntese")
+    p.add_argument("task_id")
+    p.add_argument("--file", type=Path, required=True)
+    p.add_argument("--by", default="agent")
+    p.add_argument("--wait", type=int, default=0)
+    subs.add_parser("overview", help="Cobertura de fontes, derivados e enriquecimento")
     args = parser.parse_args()
     root = args.root.resolve()
-    if args.command in {"update", "rebuild"}:
+    if args.command == "prepare":
+        from knowledge_pipeline import prepare
+        result = prepare(root, args.path, args.lexical, args.wait, args.by, lambda msg: print(msg, file=sys.stderr, flush=True))
+    elif args.command == "overview":
+        from knowledge_pipeline import overview
+        result = overview(root)
+    elif args.command == "enrichment-plan":
+        from knowledge_pipeline import plan_enrichment
+        result = plan_enrichment(root, args.query, args.source_id, args.max_tasks, args.max_input_tokens, args.by)
+    elif args.command == "enrichment-read":
+        from knowledge_pipeline import read_enrichment_task
+        result = read_enrichment_task(root, args.task_id)
+    elif args.command == "enrichment-submit":
+        from knowledge_pipeline import submit_enrichment
+        payload = load_json(args.file)
+        result = submit_enrichment(root, args.task_id, payload["title"], payload["summary"], payload["citations"], args.by, args.wait)
+    elif args.command in {"update", "rebuild"}:
         from indexer import update
         result = update(root, args.path, args.lexical, args.command == "rebuild", lambda msg: print(msg, file=sys.stderr, flush=True), reextract=args.reextract, wait=args.wait, by=args.by)
     elif args.command == "prune":
@@ -248,7 +285,7 @@ def main():
         result = check(root, args.originals)
     elif args.command == "mcp":
         from mcp_server import create_server
-        create_server(root).run(transport="stdio")
+        create_server(root, allow_writes=args.allow_writes).run(transport="stdio")
         return
     else:
         from retrieval import Knowledge

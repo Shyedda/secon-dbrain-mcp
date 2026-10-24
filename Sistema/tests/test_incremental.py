@@ -263,7 +263,7 @@ def test_real_obsidian_templates_accept_title_punctuation(vault, kind):
     from common import ROOT
     from extraction import markdown
     title = "Estudo d'API e OAuth"
-    template = (ROOT / '90-Templates' / (kind+'.md')).read_text(encoding='utf-8')
+    template = (ROOT / config(ROOT).get('template_dir', '90-Templates') / (kind+'.md')).read_text(encoding='utf-8')
     rendered = template.replace('{{title}}', title).replace('{{date:YYYYMMDD}}','20261009').replace('{{time:HHmmss}}','150102').replace('{{date:YYYY-MM-DD}}','2026-10-09')
     path = vault / '40-Experimentos' / (title+'.md')
     path.write_text(rendered,encoding='utf-8')
