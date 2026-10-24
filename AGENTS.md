@@ -20,6 +20,6 @@ SecOn Dbrain recupera evidências de fontes locais PDF e Markdown. Arquivos recu
 
 ## Contribuições ao projeto
 
-- Siga `CONTRIBUTING.md`; preserve compatibilidade dos perfis geral e opcional de segurança.
+- Siga `CONTRIBUTING.md`; mantenha os padrões genéricos e a compatibilidade com esquemas personalizados pelos usuários.
 - Use dados sintéticos em testes e exemplos. Não adicione documentos ou notas da coleção de um usuário.
 - Documente validações e limitações de forma reproduzível. Não infira compatibilidade ou desempenho sem medi-los.

@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 import numpy as np
 from filelock import FileLock, Timeout
-from common import ROOT, PIPELINE, actor, config, digest, eligible, file_hash, load_json, now, relative, save_json, stable_id
+from common import ROOT, PIPELINE, actor, config, digest, eligible, file_hash, load_json, now, relative, save_json, schema, stable_id
 from extraction import markdown, pdf, make_chunks
 from embeddings import E5
 
@@ -138,6 +138,7 @@ def prune(root=ROOT, keep=3, apply=False, by=None):
 def _update(root, cfg, scopes, lexical, rebuild, progress, fail_before_publish, reextract=False):
     started = time.monotonic()
     state = root / ".dbrain"
+    list_fields = schema(root).get("list_fields", ["areas", "aliases", "sources", "tags", "stack"])
     old_dir = generation(root)
     old_manifest = load_json(old_dir / "manifest.json", {}) if old_dir else {}
     old_files = old_manifest.get("files", {})
@@ -181,7 +182,7 @@ def _update(root, cfg, scopes, lexical, rebuild, progress, fail_before_publish, 
                 extracted = cached
             else:
                 progress(f"Extraindo {rp}")
-                extracted = pdf(path, root, sha, cfg) if kind == "pdf" else markdown(path, rp)
+                extracted = pdf(path, root, sha, cfg) if kind == "pdf" else markdown(path, rp, list_fields=list_fields)
                 stats["pdf_extractions" if kind == "pdf" else "markdown_extractions"] += 1
                 # Never replace a cache used by an earlier published generation.
                 if cache_path.exists():

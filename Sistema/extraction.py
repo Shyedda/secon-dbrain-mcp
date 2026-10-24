@@ -8,7 +8,7 @@ from pathlib import Path
 import yaml
 from common import digest, save_json, load_json, stable_id
 
-def markdown(path, relative_path):
+def markdown(path, relative_path, *, list_fields=("areas", "aliases", "sources", "tags", "stack")):
     text = Path(path).read_text(encoding="utf-8-sig")
     meta, body, first_line = {}, text, 1
     if text.startswith("---\n"):
@@ -24,7 +24,7 @@ def markdown(path, relative_path):
         first_line = text[:len(text) - len(body)].count("\n") + 1
     if meta.get("rag_exclude") is True:
         return {"excluded": True, "metadata": meta}
-    for field in ("areas", "aliases", "sources", "tags", "cwe", "owasp", "attack", "capec", "stack"):
+    for field in list_fields:
         if field in meta and not isinstance(meta[field], list):
             raise ValueError(f"Propriedade {field} precisa ser uma lista")
     source_id = str(meta.get("id") or "")

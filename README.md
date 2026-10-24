@@ -78,6 +78,10 @@ O MCP oferece `search_knowledge`, `read_knowledge`, `knowledge_status`, `knowled
 
 As skills empacotadas `dbrain-setup` e `dbrain-enrichment` orientam, respectivamente, a configuração e o enriquecimento por lotes. Consulte [Uso](docs/usage.md) para os nomes e parâmetros disponíveis.
 
+## Adaptar à sua coleção
+
+O esquema inicial usa somente a área `geral`. Defina suas próprias áreas e classificações em `Sistema/schema.json`; sinônimos opcionais de busca ficam em `lexical_expansions`, em `Sistema/config.json`. Os padrões distribuídos são independentes de qualquer biblioteca pessoal. Veja [Personalizar o contexto da coleção](docs/usage.md#personalizar-o-contexto-da-coleção).
+
 ## Evidência e privacidade
 
 Resultados são candidatos de recuperação. Verifique afirmações importantes nas fontes originais e cite a fonte com a página física do PDF ou seção/linhas do Markdown. Extração pode perder estrutura ou conteúdo, e mapas heurísticos podem errar. Não invente resultados de experimentos. Resumos não substituem as fontes e devem permanecer em revisão até serem conferidos.

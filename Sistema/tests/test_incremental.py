@@ -41,8 +41,15 @@ def vault(tmp_path, monkeypatch):
     cfg = {"include": ["20-Notas", "40-Experimentos", "Livros"], "chunk_tokens": 50, "overlap_tokens": 5, "embedding_batch": 2, "ocr": {}}
     save_json(root / "Sistema/config.json", cfg)
     system = Path(__file__).resolve().parents[1]
-    security = system / "profiles/security/schema.json"
-    save_json(root / "Sistema/schema.json", load_json(security if security.exists() else system / "schema.json"))
+    distribution_schema = system / "distribution/schema.json"
+    source_schema = distribution_schema if distribution_schema.is_file() else system / "schema.json"
+    vocabulary = load_json(source_schema)
+    vocabulary["areas"] = {"geral": "Geral"}
+    vocabulary["created_by"] = ["human", "agent", "import"]
+    vocabulary["list_fields"] = list(dict.fromkeys([*vocabulary.get("list_fields", []), "category"]))
+    vocabulary["filters"] = list(dict.fromkeys([*vocabulary.get("filters", []), "category"]))
+    vocabulary.setdefault("patterns", {})["category"] = r"^CAT-[0-9]{1,4}$"
+    save_json(root / "Sistema/schema.json", vocabulary)
     for folder in ["20-Notas", "40-Experimentos", "Livros", "90-Templates"]:
         (root / folder).mkdir()
     (root / "90-Templates/concept.md").write_text('---\ntype: concept\ntitle: "{{title}}"\nlanguage: pt-BR\nsources: []\n---\n# {{title}}\n\nExplicação inicial.\n', encoding="utf-8")
@@ -50,9 +57,9 @@ def vault(tmp_path, monkeypatch):
     monkeypatch.setattr(retrieval, "E5", FakeE5)
     return root
 
-def note(root, name="a", content="controle de acesso", sid=None):
+def note(root, name="a", content="qualidade de documentos", sid=None):
     path = root / "20-Notas" / (name + ".md")
-    path.write_text(f'---\nid: "{sid or name}"\ntitle: "{name}"\ntype: concept\nareas: [appsec]\n---\n# Parte A\n{content}\n', encoding="utf-8")
+    path.write_text(f'---\nid: "{sid or name}"\ntitle: "{name}"\ntype: concept\nareas: [geral]\n---\n# Parte A\n{content}\n', encoding="utf-8")
     return path
 
 def test_noop_does_not_read_sources_or_embed(vault, monkeypatch):
@@ -143,7 +150,7 @@ def test_missing_model_falls_back_and_paths_are_confined(vault, monkeypatch):
     note(vault)
     update(vault)
     monkeypatch.setattr(retrieval, "E5", lambda *a: (_ for _ in ()).throw(RuntimeError("offline")))
-    answer = Knowledge(vault).search("controle acesso")
+    answer = Knowledge(vault).search("qualidade documentos")
     assert answer["mode"] == "lexical" and answer["warning"]
     assert answer["results"]
     with pytest.raises(ValueError):
@@ -186,7 +193,7 @@ def test_writer_lock_rejects_concurrent_update(vault):
             update(vault)
         with pytest.raises(RuntimeError, match="Outro processo"):
             update(vault, wait=1)
-    assert update(vault, by="claude")["published"]
+    assert update(vault, by="agent")["published"]
     assert load_json(vault / ".dbrain/writer-owner.json") is None
 
 def test_queue_outside_scope_is_preserved(vault):
@@ -262,7 +269,7 @@ def test_reextraction_does_not_replace_old_snapshot(vault, monkeypatch):
 def test_real_obsidian_templates_accept_title_punctuation(vault, kind):
     from common import ROOT
     from extraction import markdown
-    title = "Estudo d'API e OAuth"
+    title = "Notas d'arquivo e revisão"
     template = (ROOT / config(ROOT).get('template_dir', '90-Templates') / (kind+'.md')).read_text(encoding='utf-8')
     rendered = template.replace('{{title}}', title).replace('{{date:YYYYMMDD}}','20261009').replace('{{time:HHmmss}}','150102').replace('{{date:YYYY-MM-DD}}','2026-10-09')
     path = vault / '40-Experimentos' / (title+'.md')
@@ -274,19 +281,19 @@ def test_real_obsidian_templates_accept_title_punctuation(vault, kind):
     stats = update(vault, ['40-Experimentos'])
     assert stats['scanned'] == 1
     assert file_hash(path) == before
-    assert Knowledge(vault, lexical=True).search('OAuth')['results']
+    assert Knowledge(vault, lexical=True).search('revisão arquivo')['results']
 
 
 def test_book_navigation_remains_readable_without_crowding_answers(vault, monkeypatch):
     (vault/'Livros/a.pdf').write_text('fixture')
     def fake(*args):
-        return {'metadata': {'title':'DevSecOps','type':'book'}, 'semantic_hash':digest('nav'), 'coverage':{'pages':2}, 'units':[
-            {'text':'DevSecOps DevSecOps CAPAUNICA','section':'Cover','pdf_page':1,'quality':'text'},
-            {'text':'DevSecOps usa revisão estática do código','section':'Chapter 1. Analysis','pdf_page':2,'quality':'text'}]}
+        return {'metadata': {'title':'Guia de documentação','type':'book'}, 'semantic_hash':digest('nav'), 'coverage':{'pages':2}, 'units':[
+            {'text':'Documentação Documentação CAPAUNICA','section':'Cover','pdf_page':1,'quality':'text'},
+            {'text':'Documentação usa critérios de qualidade','section':'Chapter 1. Overview','pdf_page':2,'quality':'text'}]}
     monkeypatch.setattr(indexer,'pdf',fake)
     update(vault)
     kb=Knowledge(vault,lexical=True)
-    result=kb.search('DevSecOps')['results']
+    result=kb.search('documentação')['results']
     assert result and all(r['locator']['pdf_page']==2 for r in result)
     cover=kb.search('capa CAPAUNICA')['results'][0]
     assert cover['locator']['pdf_page']==1
@@ -303,7 +310,7 @@ def test_invalid_model_output_never_replaces_working_index(vault, monkeypatch):
     with pytest.raises(RuntimeError,match='vetores inválidos'):
         update(vault)
     assert generation(vault)==before
-    assert Knowledge(vault,lexical=True).search('controle')['results']
+    assert Knowledge(vault,lexical=True).search('qualidade')['results']
 
 
 def test_distinct_empty_pdf_text_layers_do_not_merge(vault):
@@ -318,40 +325,40 @@ def test_distinct_empty_pdf_text_layers_do_not_merge(vault):
     assert Knowledge(vault).status()['book_works']==2
 
 def tagged(root, name, body, **meta):
-    fields = {"id": name, "title": name, "type": "concept", "areas": ["appsec"], **meta}
+    fields = {"id": name, "title": name, "type": "concept", "areas": ["geral"], **meta}
     path = root / "20-Notas" / (name + ".md")
     path.write_text("---\n" + "\n".join(f"{k}: {json.dumps(v, ensure_ascii=False)}" for k, v in fields.items()) + "\n---\n# Ideia\n" + body + "\n", encoding="utf-8")
     return path
 
 def test_agent_provenance_and_taxonomy_filters(vault, monkeypatch):
-    monkeypatch.setenv("DBRAIN_AGENT", "codex")
-    created = new_note(vault, "concept", "Autorização por objeto", ["appsec"], aliases=["BOLA"])
-    assert created["created_by"] == "codex"
+    monkeypatch.setenv("DBRAIN_AGENT", "agent")
+    created = new_note(vault, "concept", "Consistência de registros", ["geral"], aliases=["quality-check"])
+    assert created["created_by"] == "agent"
     with pytest.raises(ValueError, match="Já existe"):
-        new_note(vault, "concept", "BOLA", ["appsec"], by="claude")
+        new_note(vault, "concept", "quality-check", ["geral"], by="agent")
     with pytest.raises(ValueError, match="Área desconhecida"):
-        new_note(vault, "concept", "Outra", ["inventada"])
-    tagged(vault, "idor", "objeto pertence a outro usuário", cwe=["CWE-639"], owasp=["API1:2023"], created_by="claude")
-    tagged(vault, "xss", "objeto renderizado no navegador", cwe=["CWE-79"])
+        new_note(vault, "concept", "Outra nota", ["inventada"])
+    tagged(vault, "registro-a", "registro associado ao grupo alfa", category=["CAT-639"], created_by="agent")
+    tagged(vault, "registro-b", "registro publicado na coleção", category=["CAT-79"])
     update(vault)
     kb = Knowledge(vault, lexical=True)
-    hits = kb.search("objeto", {"cwe": "CWE-639"})["results"]
-    assert [h["source_id"] for h in hits] == ["idor"] and hits[0]["created_by"] == "claude"
+    hits = kb.search("registro", {"category": "CAT-639"})["results"]
+    assert [h["source_id"] for h in hits] == ["registro-a"] and hits[0]["created_by"] == "agent"
     with pytest.raises(ValueError, match="Filtro desconhecido"):
-        kb.search("objeto", {"inventado": "x"})
+        kb.search("registro", {"inventado": "x"})
 
 def test_check_rejects_vocabulary_outside_schema(vault):
     from dbrain import check
-    tagged(vault, "ruim", "texto", cwe=["639"], status="pronto", areas=["webhacking"])
+    tagged(vault, "nota-invalida", "registro de teste", category=["CAT-X"], status="pronto", areas=["inexistente"])
     errors = " ".join(check(vault)["errors"])
-    assert "cwe fora do padrão" in errors and "status desconhecido" in errors and "área desconhecida" in errors
+    assert "category fora do padrão" in errors and "status desconhecido" in errors and "área desconhecida" in errors
 
-def test_personal_notes_outrank_book_pages_at_similar_relevance(vault, monkeypatch):
-    tagged(vault, "nota", "autorização de objetos em apis", status="reviewed")
+def test_authored_notes_outrank_book_pages_at_similar_relevance(vault, monkeypatch):
+    tagged(vault, "nota", "qualidade em documentos padronizados", status="reviewed")
     for i in range(3):
-        tagged(vault, f"livro{i}", "autorização de objetos em apis", type="book")
+        tagged(vault, f"livro{i}", "qualidade em documentos padronizados", type="book")
     update(vault)
-    hits = Knowledge(vault, lexical=True).search("autorização de objetos em apis")["results"]
+    hits = Knowledge(vault, lexical=True).search("qualidade documentos padronizados")["results"]
     assert hits[0]["source_id"] == "nota"
 
 def test_prune_keeps_current_and_old_citations_still_resolve(vault):
@@ -373,8 +380,8 @@ def test_prune_keeps_current_and_old_citations_still_resolve(vault):
     assert "evidência estável" in reading["text"] and reading["requested_generation_removed"] == hit["locator"]["generation"]
 
 def test_book_card_with_same_name_is_related_not_duplicate(vault):
-    tagged(vault, "Threat Modeling", "ficha do livro", type="source")
-    created = new_note(vault, "concept", "Modelagem de ameaças", ["arquitetura"], aliases=["threat modeling"])
-    assert created["similar_notes"] == ["20-Notas/Threat Modeling.md"]
+    tagged(vault, "Guia de dados", "referência de dados", type="source")
+    created = new_note(vault, "concept", "Referência de dados", ["geral"], aliases=["guia de dados"])
+    assert created["similar_notes"] == ["20-Notas/Guia de dados.md"]
     with pytest.raises(ValueError, match="Já existe"):
-        new_note(vault, "concept", "Outra modelagem", ["arquitetura"], aliases=["Modelagem de ameaças"])
+        new_note(vault, "concept", "Outra referência", ["geral"], aliases=["referência de dados"])

@@ -15,9 +15,7 @@
     "Conhecimento/30-Procedimentos",
     "Conhecimento/40-Experimentos"
   ],
-  "pdf_roots": [
-    "PDFs"
-  ],
+  "pdf_roots": ["PDFs"],
   "input_dirs": {
     "pdf": "PDFs",
     "markdown": "Markdown"
