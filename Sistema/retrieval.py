@@ -12,8 +12,7 @@ from indexer import generation, readonly_db
 from embeddings import E5
 
 STOP = set("a o as os de da do das dos em na no nas nos um uma e ou para por com que como qual quais what how the a an and or to of in is are does do for on my meu minha seus suas this that".split())
-EXPANSIONS = {"autorização": "authorization", "autenticação": "authentication", "acesso": "access", "segurança": "security", "ameaças": "threat", "ameaça": "threat", "injeção": "injection", "dependências": "dependencies", "segredos": "secrets", "vulnerabilidades": "vulnerabilities", "vulnerabilidade": "vulnerability", "contêineres": "containers", "privilégios": "privileges", "sessão": "session", "sessões": "sessions", "cadeia": "supply", "assinatura": "signature", "assinaturas": "signatures", "logs": "logging", "incidentes": "incident", "criptografia": "encryption", "validação": "validation", "redes": "networks", "ameaçamento": "threat"}
-EXPANSIONS.update({'análise':'analysis', 'estática':'static', 'revisão':'review', 'humana':'human', 'rastreabilidade':'traceability', 'configuração':'configuration', 'configurações':'configuration', 'versionar':'versioning', 'entrega':'deployment', 'consultas':'queries', 'parametrizadas':'prepared statements', 'privilégio':'privilege', 'mínimo':'least', 'dados':'data', 'camadas':'layers', 'profundidade':'depth', 'autenticidade':'authenticity', 'identidades':'identities', 'orçamento':'budget', 'privacidade':'privacy'})
+EXPANSIONS = {}  # Domain vocabulary belongs to each library configuration.
 
 
 def navigation(section, lead):

@@ -156,6 +156,12 @@ submit_enrichment(task_id, title, summary, citations: list[int], by='agent')
 O envio cria um Markdown derivado em `Conhecimento/20-Notas/`, indexa-o e registra `source_refs` com o hash e os localizadores da fonte. A nota nasce em `needs-review`. A validação verifica a estrutura da citação e a versão da fonte, mas não a fidelidade semântica do resumo. A busca exclui derivados quando detecta mudanças pela versão indexada ou pelo tamanho/data dos arquivos. A leitura de Gold também verifica o hash real da fonte e recusa a síntese se os bytes divergirem. Sempre leia o resultado antes de fundamentar a resposta. Execute `prepare` e planeje uma tarefa nova para fontes alteradas. Não invente fatos, páginas, resultados ou experimentos executados. O fluxo usa trechos no contexto do assistente, não treina o modelo e não faz chamadas a uma API de geração do projeto.
 ## 7. Privacidade e limites
 
+### Personalizar o contexto da coleção
+
+O esquema inicial em `Sistema/schema.json` contém somente a área `geral`, sem um perfil profissional predefinido. Acrescente suas próprias áreas nesse arquivo e use seus identificadores nos metadados das notas. `list_fields`, `patterns` e `filters` permitem definir campos de classificação adequados à sua coleção; campos listados em `list_fields` devem conter listas no YAML. O parâmetro `schema_file` em `Sistema/config.json` também permite apontar para outro esquema local.
+
+Sinônimos opcionais de busca ficam em `lexical_expansions`, no formato `{"termo": "termo equivalente"}`, em `Sistema/config.json`; o padrão é vazio. Essas configurações são escolhas da sua instalação. Não inclua preferências, caminhos, instruções ou conteúdo pessoal em contribuições públicas. Confira o diff dos arquivos de configuração antes de publicar.
+
 Arquivos originais permanecem sob controle local e devem ser preservados. Índices, embeddings, extrações, cache e outros derivados técnicos ficam em `.dbrain/`; conteúdo privado e dados locais são ignorados pelo Git conforme a configuração da distribuição. Confira `git status` antes de compartilhar uma alteração.
 
 Trechos retornados pelo MCP podem ser enviados ao provedor de IA usado na conversa. Não indexe credenciais, segredos ou conteúdo que não possa ser compartilhado com esse serviço. Extração e recuperação têm limites, mapas heurísticos podem errar e resumos opcionais podem omitir contexto. Valide na fonte antes de usar uma afirmação como fato. Nunca registre um experimento como executado sem evidência de que foi realizado.

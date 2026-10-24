@@ -16,7 +16,7 @@ Não inclua chaves, tokens, arquivos `.env`, caminhos de usuário, conteúdo de 
 
 Alterações em extração, segmentação, identidade de fontes, atualização incremental, exclusão ou publicação do índice precisam demonstrar que mudanças parciais não corrompem o estado e não regravam fontes. Cubra falhas antes da publicação, arquivos adicionados/alterados/removidos e consistência entre índice e origem, conforme aplicável.
 
-Mudanças em esquemas devem manter o perfil geral neutro funcional e tratar o perfil de segurança como opcional. Documente compatibilidade, migração de configuração e qualquer mudança que exija reconstrução explícita. Não altere silenciosamente a modalidade ou o modelo de uma coleção existente.
+Mudanças em esquemas devem manter os padrões genéricos funcionais e permitir a personalização local de áreas, filtros e padrões pelo usuário. Não copie configurações de uma biblioteca pessoal para o pacote público. Documente compatibilidade, migração de configuração e qualquer mudança que exija reconstrução explícita. Não altere silenciosamente a modalidade ou o modelo de uma coleção existente.
 
 ## Documentação
 

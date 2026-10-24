@@ -178,7 +178,7 @@ def check(root, originals=False):
         for path, entry in baseline.get("study", {}).items():
             p = Path(path)
             if not p.exists() or file_hash(p) != entry["sha256"]:
-                result["errors"].append("Original de Estudo divergiu: " + path)
+                result["errors"].append("Original externo divergiu: " + path)
             else:
                 result["originals_verified"] += 1
     result["ok"] = not result["errors"]
@@ -207,7 +207,7 @@ def main():
     p.add_argument("--limit", type=int, default=8)
     p.add_argument("--area")
     p.add_argument("--type")
-    p.add_argument("--filter", action="append", default=[], metavar="CAMPO=VALOR", help="Filtro adicional (cwe, owasp, attack, stack, created_by, status...); pode repetir")
+    p.add_argument("--filter", action="append", default=[], metavar="CAMPO=VALOR", help="Filtro definido no esquema (areas, tags, status, created_by...); pode repetir")
     p.add_argument("--lexical", action="store_true")
     p = subs.add_parser("read", help="Ler uma fonte cadastrada")
     p.add_argument("source_id")

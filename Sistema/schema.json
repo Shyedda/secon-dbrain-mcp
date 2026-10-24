@@ -1,72 +1,33 @@
 {
   "version": 1,
   "types": {
-    "concept": "Ideia atômica e reutilizável, com título em forma de afirmação.",
-    "procedure": "Sequência completa para executar ou verificar algo.",
-    "checklist": "Lista de itens verificáveis para uma atividade.",
-    "tool": "Uso de uma ferramenta: versão, comandos essenciais, saídas e armadilhas.",
-    "experiment": "Hipótese, método e resultados de um experimento.",
-    "writeup": "Relato de um problema, solução e aprendizado.",
-    "source": "Ficha de livro, curso, artigo ou documentação.",
-    "case-study": "Decisões e evidências de um projeto real.",
-    "guide": "Orientação de uso ou referência da coleção.",
-    "map": "Mapa de conteúdo (MOC) de uma área.",
-    "book": "PDF indexado (gerado pelo extrator).",
-    "note": "Markdown sem tipo declarado."
+    "concept": "Reusable idea or principle.",
+    "procedure": "Ordered steps for completing or checking a task.",
+    "checklist": "Verifiable items for a task or review.",
+    "tool": "Reference for using a tool, including version and limitations.",
+    "experiment": "Hypothesis, method, expected result, and observed result.",
+    "writeup": "Account of a problem, evidence, solution, and lessons learned.",
+    "source": "Record of a book, course, article, or documentation source.",
+    "case-study": "Decisions and evidence from a project or situation.",
+    "guide": "Instructions or reference for a collection.",
+    "map": "Overview that links related content.",
+    "book": "Indexed PDF source.",
+    "note": "Markdown note without a declared type."
   },
-  "personal_types": [
-    "concept",
-    "procedure",
-    "checklist",
-    "tool",
-    "experiment",
-    "writeup",
-    "case-study"
-  ],
+  "personal_types": ["concept", "procedure", "checklist", "tool", "experiment", "writeup", "case-study"],
   "areas": {
     "geral": "Geral"
   },
   "status": {
-    "imported": "Incorporado sem revisão de conteúdo.",
-    "needs-review": "Pendente de revisão de conteúdo (padrão para notas criadas por agentes).",
-    "reviewed": "Revisado por humano ou agente delegado pelo usuário; observar responsável, fontes e review_scope. Não atesta execução de testes.",
-    "deprecated": "Mantido para histórico; não usar como referência atual."
+    "imported": "Added to the collection without content review.",
+    "needs-review": "Awaiting content review.",
+    "reviewed": "Reviewed for the stated scope; this does not imply that tests were run.",
+    "deprecated": "Retained for history; not a current reference."
   },
-  "created_by": [
-    "human",
-    "agent",
-    "import"
-  ],
-  "list_fields": [
-    "areas",
-    "aliases",
-    "sources",
-    "tags",
-    "cwe",
-    "owasp",
-    "attack",
-    "capec",
-    "stack"
-  ],
+  "created_by": ["human", "agent", "import"],
+  "list_fields": ["areas", "aliases", "sources", "tags", "stack"],
   "patterns": {
-    "cwe": "^CWE-[0-9]{1,4}$",
-    "capec": "^CAPEC-[0-9]{1,4}$",
-    "attack": "^(T[0-9]{4}(\\.[0-9]{3})?|TA[0-9]{4})$",
-    "owasp": "^(A|API|LLM|M|K)[0-9]{1,2}:20[0-9]{2}$",
     "stack": "^[a-z0-9][a-z0-9.+#-]*$"
   },
-  "filters": [
-    "areas",
-    "type",
-    "language",
-    "status",
-    "source_id",
-    "created_by",
-    "cwe",
-    "owasp",
-    "attack",
-    "capec",
-    "stack",
-    "tags"
-  ]
+  "filters": ["areas", "type", "language", "status", "source_id", "created_by", "stack", "tags"]
 }
