@@ -176,3 +176,233 @@ def test_mcp_writers_are_opt_in_and_complete_a_real_protocol_roundtrip(collectio
         await exercise(False)
         await exercise(True)
     asyncio.run(asyncio.wait_for(both(), timeout=45))
+
+
+def test_navigation_maps_have_stable_names_ids_and_are_noop_when_unchanged(collection):
+    import yaml
+
+    result = prepare(collection, lexical=True)
+    inventory = collection / "Conhecimento/00-Inicio/Mapa geral do acervo.md"
+    topics = collection / "Conhecimento/00-Inicio/Mapa de temas.md"
+    assert inventory.is_file() and topics.is_file()
+    assert result["generated_or_updated"]
+    first = {path: path.read_bytes() for path in (inventory, topics)}
+    ids = {path: yaml.safe_load(path.read_text(encoding="utf-8").split("---", 2)[1])["id"] for path in (inventory, topics)}
+    assert list((collection / "Conhecimento/10-Fontes").glob("Indice*.md"))
+
+    repeated = prepare(collection, lexical=True)
+    assert repeated["generated_or_updated"] == []
+    assert repeated["derived_update"] is None
+    assert {path: path.read_bytes() for path in (inventory, topics)} == first
+
+    source = collection / "Markdown/estudo.md"
+    source.write_text(source.read_text(encoding="utf-8") + "\nUma nova evidência de autorização.\n", encoding="utf-8")
+    changed = prepare(collection, lexical=True)
+    assert changed["generated_or_updated"]
+    assert {path: yaml.safe_load(path.read_text(encoding="utf-8").split("---", 2)[1])["id"] for path in (inventory, topics)} == ids
+    assert all(path.read_bytes() != first[path] for path in (inventory, topics))
+    histories = list((collection / ".dbrain/knowledge/history/maps").rglob("*.md"))
+    assert all(any(path.read_bytes() == old for path in histories) for old in first.values())
+    kb = Knowledge(collection)
+    map_hits = kb.search("Mapa geral do acervo")["results"]
+    assert not any("history/maps" in hit["path"] for hit in map_hits)
+
+
+def test_legacy_map_migration_preserves_content_and_archives_only_registered_bytes(collection):
+    import yaml
+
+    prepare(collection, lexical=True)
+    stable = collection / "Conhecimento/00-Inicio/Mapa geral do acervo.md"
+    original = stable.read_bytes()
+    original_id = yaml.safe_load(stable.read_text(encoding="utf-8").split("---", 2)[1])["id"]
+    legacy = stable.with_name("Mapa geral do acervo - abcdef123456.md")
+    legacy.write_bytes(original)
+    stable.unlink()
+    registry_path = collection / ".dbrain/knowledge/generated-files.json"
+    registry = load_json(registry_path)
+    registry.pop(stable.relative_to(collection).as_posix(), None)
+    registry[legacy.relative_to(collection).as_posix()] = file_hash(legacy)
+    save_json(registry_path, registry)
+
+    source = collection / "Markdown/estudo.md"
+    source.write_text(source.read_text(encoding="utf-8") + "\nMudança para disparar a migração.\n", encoding="utf-8")
+    result = prepare(collection, lexical=True)
+    migrated = stable.read_bytes()
+    assert yaml.safe_load(stable.read_text(encoding="utf-8").split("---", 2)[1])["id"] == original_id
+    assert not legacy.exists()
+    assert legacy.relative_to(collection).as_posix() in result["archived_maps"]
+    assert migrated != original  # The stable map reflects the changed source.
+    assert any(p.read_bytes() == original for p in (collection / ".dbrain/knowledge/history/maps").rglob("*.md"))
+
+
+def test_map_edits_and_unregistered_legacy_names_are_preserved(collection):
+    prepare(collection, lexical=True)
+    stable = collection / "Conhecimento/00-Inicio/Mapa geral do acervo.md"
+    legacy = collection / "Conhecimento/00-Inicio/Mapa por tema - 123456abcdef.md"
+    unregistered = collection / "Conhecimento/00-Inicio/Mapa geral do acervo - 987654abcdef.md"
+    stable.write_text(stable.read_text(encoding="utf-8") + "\nEDIÇÃO HUMANA NO MAPA ESTÁVEL\n", encoding="utf-8")
+    legacy.write_text("# Mapa legado editado\n\nEDIÇÃO HUMANA LEGADA\n", encoding="utf-8")
+    unregistered.write_text("# Mapa não registrado\n\nEDIÇÃO HUMANA\n", encoding="utf-8")
+    expected = {path: path.read_bytes() for path in (stable, legacy, unregistered)}
+    registry_path = collection / ".dbrain/knowledge/generated-files.json"
+    registry = load_json(registry_path)
+    registry[legacy.relative_to(collection).as_posix()] = digest("conteúdo anterior, diferente da edição atual")
+    save_json(registry_path, registry)
+
+    source = collection / "Markdown/estudo.md"
+    source.write_text(source.read_text(encoding="utf-8") + "\nAlteração da fonte.\n", encoding="utf-8")
+    result = prepare(collection, lexical=True)
+    assert all(path.exists() and path.read_bytes() == data for path, data in expected.items())
+    preserved = set(result["human_edits_preserved"])
+    assert {path.relative_to(collection).as_posix() for path in (stable, legacy, unregistered)} <= preserved
+    archived = set(result["archived_maps"])
+    assert legacy.relative_to(collection).as_posix() not in archived
+    assert unregistered.relative_to(collection).as_posix() not in archived
+
+
+def test_topic_map_omits_navigation_noise_but_keeps_relevant_shared_terms(collection):
+    (collection / "Markdown/estudo.md").write_text(
+        "# Autorização no servidor\n\nControle de acesso autorização servidor política validação. "
+        "figure example what table figura exemplo. Contexto único alfa.\n", encoding="utf-8")
+    (collection / "Markdown/segundo.md").write_text(
+        "# Autorização no servidor\n\nControle de acesso autorização servidor política validação. "
+        "figure example what table figura exemplo. Contexto único beta.\n", encoding="utf-8")
+    prepare(collection, lexical=True)
+    topics = (collection / "Conhecimento/00-Inicio/Mapa de temas.md").read_text(encoding="utf-8").lower()
+    headings = {line[3:].strip() for line in topics.splitlines() if line.startswith("## ")}
+    assert headings & {"autorização", "servidor", "controle", "acesso", "política", "validação"}
+    assert not headings & {"figure", "example", "what", "table", "figura", "exemplo"}
+
+
+def test_retry_with_source_scope_retires_archived_legacy_map_after_publish_failure(collection, monkeypatch):
+    import knowledge_pipeline
+
+    prepare(collection, lexical=True)
+    stable = collection / "Conhecimento/00-Inicio/Mapa geral do acervo.md"
+    legacy = stable.with_name("Mapa geral do acervo - abcdef123456.md")
+    legacy.write_bytes(stable.read_bytes())
+    stable.unlink()
+    registry_path = collection / ".dbrain/knowledge/generated-files.json"
+    registry = load_json(registry_path)
+    registry.pop(stable.relative_to(collection).as_posix(), None)
+    registry[legacy.relative_to(collection).as_posix()] = file_hash(legacy)
+    save_json(registry_path, registry)
+    source = collection / "Markdown/estudo.md"
+    source.write_text(source.read_text(encoding="utf-8") + "\nMudança antes da falha de publicação.\n", encoding="utf-8")
+
+    real_update = knowledge_pipeline.update
+    calls = 0
+
+    def fail_second_update(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("Falha simulada ao publicar mapas")
+        return real_update(*args, **kwargs)
+
+    monkeypatch.setattr(knowledge_pipeline, "update", fail_second_update)
+    with pytest.raises(OSError, match="publicar mapas"):
+        prepare(collection, paths=["Markdown/estudo.md"], lexical=True)
+    assert not legacy.exists()
+
+    monkeypatch.setattr(knowledge_pipeline, "update", real_update)
+    prepare(collection, paths=["Markdown/estudo.md"], lexical=True)
+    hits = Knowledge(collection).search("Mapa geral do acervo")["results"]
+    assert not any("Mapa geral do acervo - abcdef123456.md" in hit["path"] for hit in hits)
+    assert not any("history/maps" in hit["path"] for hit in hits)
+
+
+def test_human_edit_racing_stable_map_capture_is_restored_and_reported(collection, monkeypatch):
+    import knowledge_pipeline
+
+    prepare(collection, lexical=True)
+    stable = collection / "Conhecimento/00-Inicio/Mapa geral do acervo.md"
+    source = collection / "Markdown/estudo.md"
+    source.write_text(source.read_text(encoding="utf-8") + "\nMudança que atualiza o mapa.\n", encoding="utf-8")
+    real_rename = knowledge_pipeline.os.rename
+    captured = {}
+
+    def edit_before_capture(src, dst, *args, **kwargs):
+        nonlocal captured
+        if Path(src) == stable and not captured:
+            stable.write_bytes(stable.read_bytes() + b"\nEDICAO HUMANA DURANTE CAPTURA\n")
+            captured["bytes"] = stable.read_bytes()
+        return real_rename(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(knowledge_pipeline.os, "rename", edit_before_capture)
+    result = prepare(collection, lexical=True)
+    rel = stable.relative_to(collection).as_posix()
+    assert captured["bytes"]
+    assert stable.is_file() and stable.read_bytes() == captured["bytes"]
+    assert rel in result["human_edits_preserved"]
+
+
+def test_human_edit_racing_legacy_map_capture_is_restored_and_reported(collection, monkeypatch):
+    import knowledge_pipeline
+
+    prepare(collection, lexical=True)
+    legacy = collection / "Conhecimento/00-Inicio/Mapa geral do acervo - abcdef123456.md"
+    stable = collection / "Conhecimento/00-Inicio/Mapa geral do acervo.md"
+    legacy.write_bytes(stable.read_bytes())
+    stable.unlink()
+    registry_path = collection / ".dbrain/knowledge/generated-files.json"
+    registry = load_json(registry_path)
+    registry.pop(stable.relative_to(collection).as_posix(), None)
+    registry[legacy.relative_to(collection).as_posix()] = file_hash(legacy)
+    save_json(registry_path, registry)
+    real_rename = knowledge_pipeline.os.rename
+    captured = {}
+
+    def edit_before_capture(src, dst, *args, **kwargs):
+        if Path(src) == legacy and not captured:
+            legacy.write_bytes(legacy.read_bytes() + b"\nEDICAO HUMANA DURANTE CAPTURA\n")
+            captured["bytes"] = legacy.read_bytes()
+        return real_rename(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(knowledge_pipeline.os, "rename", edit_before_capture)
+    result = prepare(collection, lexical=True)
+    rel = legacy.relative_to(collection).as_posix()
+    assert captured["bytes"]
+    assert legacy.is_file() and legacy.read_bytes() == captured["bytes"]
+    assert rel in result["human_edits_preserved"]
+
+
+def test_legacy_map_recreated_after_rename_is_preserved_reported_and_indexed(collection, monkeypatch):
+    import yaml
+    import knowledge_pipeline
+
+    prepare(collection, lexical=True)
+    legacy = collection / "Conhecimento/00-Inicio/Mapa geral do acervo - abcdef123456.md"
+    stable = collection / "Conhecimento/00-Inicio/Mapa geral do acervo.md"
+    legacy.write_bytes(stable.read_bytes())
+    stable.unlink()
+    registry_path = collection / ".dbrain/knowledge/generated-files.json"
+    registry = load_json(registry_path)
+    registry.pop(stable.relative_to(collection).as_posix(), None)
+    registry[legacy.relative_to(collection).as_posix()] = file_hash(legacy)
+    save_json(registry_path, registry)
+    original = legacy.read_bytes()
+    human_bytes = original + b"\nEDICAO HUMANA APOS RENAME\n"
+    legacy_id = yaml.safe_load(original.decode("utf-8").split("---", 2)[1])["id"]
+    real_rename = knowledge_pipeline.os.rename
+    recreated = {}
+
+    def recreate_after_capture(src, dst, *args, **kwargs):
+        outcome = real_rename(src, dst, *args, **kwargs)
+        if Path(src) == legacy and not recreated:
+            legacy.write_bytes(human_bytes)
+            recreated["done"] = True
+        return outcome
+
+    monkeypatch.setattr(knowledge_pipeline.os, "rename", recreate_after_capture)
+    result = prepare(collection, lexical=True)
+    rel = legacy.relative_to(collection).as_posix()
+    assert recreated["done"]
+    assert legacy.is_file() and legacy.read_bytes() == human_bytes
+    assert rel in result["human_edits_preserved"]
+    stable_id = yaml.safe_load(stable.read_text(encoding="utf-8").split("---", 2)[1])["id"]
+    assert stable_id != legacy_id
+    hits = Knowledge(collection).search("Mapa geral do acervo")["results"]
+    hit_paths = {Path(hit["path"]).resolve().relative_to(collection).as_posix() for hit in hits}
+    assert rel in hit_paths
+    assert stable.relative_to(collection).as_posix() in hit_paths

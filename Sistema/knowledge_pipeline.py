@@ -6,14 +6,18 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 import json
 import math
+import os
 from pathlib import Path
 import re
+import tempfile
+import uuid
 import yaml
 from common import actor, config, digest, file_hash, library_path, load_json, now, relative, save_json, stable_id
 from indexer import generation, readonly_db, update, writer
 
 VERSION = "enrichment-1"
 STOP = set("a o as os de da do das dos e em um uma para por com que no na nos nas the of and to in is for on with this that from chapter section introduction contents references copyright page parte capítulo seção introdução sumário http https www como mais não são uma seu sua can use using all it be or at an you your will has have text book".split())
+STOP.update("figure figures fig table tables example examples figura figuras tabela tabelas exemplo exemplos what which when where there these those their them also such into then than each other both about through would could should further following above below shown show shows see more most some any only same first next last however therefore thus packt oreilly isbn edition editions páginas página pages edição edições author authors autores autor publisher published publication publishing print printed press download downloads available online todos todas esse essa esses essas este esta estes estas isso isto aqui onde quando qual quais quem pelo pela pelos pelas entre sobre ainda assim pode podem deve devem apenas mesmo mesma também depois antes outro outra outros outras seguinte seguintes veja ver exemplo exemplo".split())
 
 
 def _settings(root):
@@ -106,8 +110,8 @@ def overview(root):
     return {"indexed": True, "generation": directory.name, "sources": pending, "source_count": len(sources), "derived": derived, "enrichment": {"planned": len(jobs), "submitted": sum(j.get("status") == "submitted" for j in jobs)}, "coverage_note": "Cobertura de extração/indexação, não porcentagem de conhecimento compreendido. Tabelas, imagens, OCR e sínteses requerem avaliação.", "provider_calls": 0}
 
 
-def _markdown(meta, body):
-    if meta.get("generated_by_pipeline"):
+def _markdown(meta, body, *, versioned_id=True):
+    if versioned_id and meta.get("generated_by_pipeline"):
         meta = {**meta, "id": stable_id(meta["id"] + digest(body))}
     return "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + "---\n\n" + body.rstrip() + "\n"
 
@@ -133,17 +137,147 @@ def _write_owned(root, rel, text, registry, changed, preserved):
     return rel
 
 
+def _topic_terms(title, units):
+    """Local navigation hints, never a claim of verified conceptual relations."""
+    text = title + "\n" + "\n".join(u.get("section", "") + "\n" + u.get("text", "")[:600] for u in units)
+    text = re.sub(r"(?im)^\s*(?:fig(?:ure)?s?|tables?|examples?|figuras?|tabelas?|exemplos?)\s+\d[^\n]*", "", text)
+    return Counter(t for t in re.findall(r"[^\W\d_][\w-]{3,}", text.lower()) if t not in STOP)
+
+
+def _map_metadata(path):
+    parts = path.read_text(encoding="utf-8").split("---", 2)
+    meta = yaml.safe_load(parts[1]) if len(parts) == 3 and not parts[0].strip() else None
+    return meta if isinstance(meta, dict) else {}
+
+
+def _map_id(root, rel, names, registry, manifest):
+    target = library_path(root, rel)
+    if target.is_file() and rel in registry:
+        existing = _map_metadata(target).get("id")
+        if existing:
+            return existing
+    candidates = []
+    for path, expected in registry.items():
+        if Path(path).parent != Path(rel).parent:
+            continue
+        candidate = library_path(root, path)
+        if not candidate.is_file() or candidate.is_symlink() or file_hash(candidate) != expected:
+            continue
+        meta = _map_metadata(candidate)
+        if meta.get("generated_by_pipeline") and meta.get("type") == "map" and meta.get("title") in names and meta.get("id"):
+            candidates.append((derivative_state(root, meta, manifest)["stale"], -candidate.stat().st_mtime_ns, path, meta["id"]))
+    return min(candidates)[-1] if candidates else stable_id("silver-map:" + rel)
+
+
+def _archive_map(root, path, content):
+    """Capture the actual file atomically; a racing edit stays in the history."""
+    archive = library_path(root, ".dbrain/knowledge/history/maps/" + digest(content) + "-" + uuid.uuid4().hex + ".md")
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    path.rename(archive)
+    return archive
+
+
+def _restore_map(archive, target):
+    try:
+        os.link(archive, target)
+    except FileExistsError:
+        pass  # A newer editor save has priority; both versions remain preserved.
+
+
+def _write_current_map(root, rel, text, registry, changed, preserved):
+    target = library_path(root, rel)
+    content = text.encode("utf-8")
+    if target.is_symlink():
+        preserved.append(rel)
+        return False
+    previous = target.read_bytes() if target.exists() else None
+    if previous is not None and digest(previous) != registry.get(rel):
+        preserved.append(rel)
+        return False
+    if previous == content:
+        return True
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".map-", suffix=".tmp", delete=False) as stream:
+        temporary = Path(stream.name)
+        stream.write(content)
+    captured = None
+    try:
+        if previous is not None:
+            try:
+                captured = _archive_map(root, target, previous)
+            except FileNotFoundError:
+                preserved.append(rel)
+                return False
+            if captured.read_bytes() != previous:
+                _restore_map(captured, target)
+                preserved.append(rel)
+                return False
+        # Publishing a fully written inode fails if an editor recreated the path.
+        try:
+            os.link(temporary, target)
+        except FileExistsError:
+            preserved.append(rel)
+            return False
+        except OSError:
+            if captured is not None:
+                _restore_map(captured, target)
+            raise
+    finally:
+        temporary.unlink(missing_ok=True)
+    registry[rel] = digest(content)
+    changed.append(rel)
+    return True
+
+
+def _retire_legacy_maps(root, base, names, registry, archived, preserved):
+    pattern = re.compile(r"(?:" + "|".join(re.escape(name) for name in names) + r") - [a-f0-9]{12}\.md")
+    for rel, expected in list(registry.items()):
+        value = Path(rel)
+        if value.parent.as_posix() != f"{base}/00-Inicio" or not pattern.fullmatch(value.name):
+            continue
+        path = library_path(root, rel)
+        if not path.is_file():
+            continue
+        if path.is_symlink():
+            preserved.append(rel)
+            continue
+        content = path.read_bytes()
+        meta = _map_metadata(path)
+        if not meta.get("generated_by_pipeline") or meta.get("type") != "map" or digest(content) != expected:
+            preserved.append(rel)
+            continue
+        try:
+            captured = _archive_map(root, path, content)
+        except FileNotFoundError:
+            preserved.append(rel)
+            continue
+        if captured.read_bytes() != content:
+            _restore_map(captured, path)
+            preserved.append(rel)
+            continue
+        registry.pop(rel)
+        if path.exists():
+            preserved.append(rel)
+        else:
+            archived.append(rel)
+
+
 def prepare(root, paths=None, lexical=False, wait=0, by=None, progress=None):
     root = Path(root).resolve()
     _, base, inputs = _settings(root)
     first = update(root, paths, lexical=lexical, wait=wait, by=by, progress=progress)
-    changed, preserved = [], []
+    changed, preserved, archived = [], [], []
     with writer(root, "prepare maps", wait, by):
         _, current_manifest, docs = _snapshot(root)
         sources = _sources(root, docs)
         registry_path = root / ".dbrain/knowledge/generated-files.json"
         registry = load_json(registry_path, {})
         preserved.extend(p for p, sha in registry.items() if library_path(root, p).exists() and file_hash(library_path(root, p)) != sha)
+        for candidate in library_path(root, f"{base}/00-Inicio").glob("Mapa*.md"):
+            if re.fullmatch(r"(?:Mapa geral do acervo|Mapa por tema|Mapa de temas) - [a-f0-9]{12}\.md", candidate.name):
+                rel = candidate.relative_to(root).as_posix()
+                if rel not in registry:
+                    preserved.append(rel)
         refs = [{"source_id": sid, "sha256": doc["sha"], "paths": doc["paths"]} for sid, doc in sorted(sources.items())]
         terms, cards = {}, {}
         for sid, doc in sorted(sources.items()):
@@ -151,10 +285,7 @@ def prepare(root, paths=None, lexical=False, wait=0, by=None, progress=None):
             title = doc["metadata"]["title"]
             card = f"{base}/10-Fontes/Indice - {sid}.md"
             cards[sid] = card
-            # Deterministic descriptive terms; no claim of verified conceptual relations.
-            text = title + " " + " ".join(u.get("section", "") + " " + u.get("text", "")[:600] for u in ext.get("units", []))
-            counts = Counter(t for t in re.findall(r"[^\W\d_][\w-]{3,}", text.lower()) if t not in STOP)
-            terms[sid] = counts
+            terms[sid] = _topic_terms(title, ext.get("units", []))
             existing_card = next((d for d in docs.values() if d["metadata"].get("source_id") == sid and not d["metadata"].get("generated_by_pipeline")), None)
             if existing_card:
                 cards[sid] = existing_card["paths"][0]
@@ -172,25 +303,43 @@ def prepare(root, paths=None, lexical=False, wait=0, by=None, progress=None):
         signatures = {sid: set(sorted(counts, key=lambda t: counts[t] * math.log(1 + len(terms) / frequencies[t]), reverse=True)[:12]) for sid, counts in terms.items()}
         inventory = "# Mapa geral do acervo\n\nFontes preservadas nas entradas; texto preparado e indexado localmente. Sínteses Gold são opcionais.\n\n"
         inventory += "\n".join(f"- [[{cards[sid]}|{doc['metadata']['title']}]] — `{sid}`" for sid, doc in sorted(sources.items()))
-        topics = "# Mapa por tema\n\nAgrupamentos heurísticos por termos compartilhados; não comprovam equivalência ou concordância entre autores.\n\n"
+        topics = "# Mapa de temas\n\nAgrupamentos heurísticos por termos compartilhados; não comprovam equivalência ou concordância entre autores. Não substituem os mapas editoriais nem a consulta às fontes.\n\n"
         groups = defaultdict(list)
         for sid, signature in signatures.items():
             for term in signature:
                 groups[term].append(sid)
-        for term, ids in sorted(groups.items(), key=lambda item: (-len(item[1]), item[0]))[:40]:
-            if len(ids) >= 2:
-                topics += f"## {term}\n\n" + "\n".join(f"- [[{cards[sid]}|{sources[sid]['metadata']['title']}]]" for sid in ids) + "\n\n"
+        shared = [(term, ids) for term, ids in groups.items() if len(ids) >= 2]
+        for term, ids in sorted(shared, key=lambda item: (-len(item[1]), item[0]))[:40]:
+            topics += f"## {term}\n\n" + "\n".join(f"- [[{cards[sid]}|{sources[sid]['metadata']['title']}]]" for sid in ids) + "\n\n"
+        if not shared:
+            topics += "Ainda não há termos compartilhados suficientes para formar agrupamentos. Consulte o [[Mapa geral do acervo]] para acessar as fontes.\n"
         fingerprint = digest(json.dumps(sorted((r["source_id"], r["sha256"], p) for r in refs for p in r["paths"])))
         meta = {"type": "map", "status": "imported", "created_by": "import", "areas": [], "sources": [], "layer": "silver", "generated_by_pipeline": VERSION, "source_refs": refs, "source_set_fingerprint": fingerprint}
-        for name, body in (("Mapa geral do acervo", inventory), ("Mapa por tema", topics)):
-            _write_owned(root, f"{base}/00-Inicio/{name}.md", _markdown({**meta, "id": stable_id("silver-map:" + name + fingerprint + digest(body)), "title": name}, body), registry, changed, preserved)
+        for name, legacy_names, body in (("Mapa geral do acervo", ("Mapa geral do acervo",), inventory), ("Mapa de temas", ("Mapa por tema", "Mapa de temas"), topics)):
+            rel = f"{base}/00-Inicio/{name}.md"
+            map_id = _map_id(root, rel, legacy_names, registry, current_manifest)
+            _retire_legacy_maps(root, base, legacy_names, registry, archived, preserved)
+            # An edited legacy note keeps its ID; a new generated map must not duplicate it.
+            if not library_path(root, rel).exists() and any(library_path(root, p).is_file() and _map_metadata(library_path(root, p)).get("id") == map_id for p in preserved):
+                map_id = stable_id("silver-map:" + rel + ":after-manual:" + map_id)
+            text = _markdown({**meta, "id": map_id, "title": name}, body, versioned_id=False)
+            _write_current_map(root, rel, text, registry, changed, preserved)
+        # A previous run may have archived files before its index publication failed.
+        for doc in docs.values():
+            if not doc["metadata"].get("generated_by_pipeline") or doc["metadata"].get("type") != "map":
+                continue
+            for path in doc["paths"]:
+                history = library_path(root, ".dbrain/knowledge/history/maps")
+                if Path(path).parent.as_posix() == f"{base}/00-Inicio" and not library_path(root, path).exists() and any(file_hash(archive) == doc["sha"] for archive in history.glob(doc["sha"] + "*.md")):
+                    archived.append(path)
         save_json(registry_path, registry)
         unpublished = [p for p in registry if library_path(root, p).exists() and current_manifest["files"].get(p, {}).get("sha") != file_hash(library_path(root, p))]
-    publish_paths = list(dict.fromkeys(changed + unpublished))
+    archived = sorted(set(archived))
+    publish_paths = list(dict.fromkeys(changed + unpublished + archived + preserved))
     second = update(root, publish_paths, lexical=lexical, wait=wait, by=by, progress=progress) if publish_paths else None
     report = overview(root)
     save_json(root / ".dbrain/knowledge/coverage.json", report)
-    return {"source_update": first, "derived_update": second, "generated_or_updated": changed, "human_edits_preserved": preserved, "source_count": report["source_count"], "input_dirs": inputs, "provider_calls": 0, "next": "Consulte a base agora; use enrichment-plan para sínteses opcionais em lotes."}
+    return {"source_update": first, "derived_update": second, "generated_or_updated": changed, "archived_maps": archived, "human_edits_preserved": sorted(set(preserved)), "source_count": report["source_count"], "input_dirs": inputs, "provider_calls": 0, "next": "Consulte a base agora; use enrichment-plan para sínteses opcionais em lotes."}
 
 
 def _task_path(root, task_id):
