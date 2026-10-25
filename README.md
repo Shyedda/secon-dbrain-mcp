@@ -4,9 +4,9 @@ SecOn Dbrain transforma seus livros, documentações técnicas e anotações em 
 
 ## Visualização do conhecimento
 
-![Animação de um grafo com notas, fontes e mapas conectados](docs/media/knowledge-graph.gif)
+![Demonstração do grafo, da navegação pelas notas e das páginas de referência](docs/media/knowledge-graph.gif)
 
-Uma coleção organizada pode ser explorada como um grafo no Obsidian, com conexões entre fontes, notas e mapas. Essa visualização é opcional e depende dos links entre as notas; a IA consulta as evidências pelo RAG/MCP. O GIF usa um trecho ilustrativo sem áudio, títulos pessoais ou páginas dos materiais.
+Uma coleção organizada pode ser explorada como um grafo no Obsidian, com conexões entre fontes, notas e mapas. Essa visualização é opcional e depende dos links entre as notas; a IA consulta as evidências pelo RAG/MCP. A demonstração mostra o grafo, a navegação pelas notas, as referências e a prévia das páginas em PDF, sem áudio e com reprodução ligeiramente mais lenta para facilitar a leitura. Os temas exibidos ilustram uma coleção; o projeto aceita materiais de qualquer área.
 
 Veja os [exemplos e prompts de uso do MCP](docs/usage.md#checklist-rápido-e-prompts) para consultar sua própria coleção.
 
