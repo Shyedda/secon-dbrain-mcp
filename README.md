@@ -1,10 +1,10 @@
 # SecOn Dbrain
 
-SecOn Dbrain transforma seus livros, documentações técnicas e anotações em uma biblioteca RAG local acessível por MCP. Adicione PDFs e Markdown, prepare a base no seu computador e peça ao assistente de IA para consultar os trechos relevantes com referências às fontes. A preparação local dispensa tokens de um provedor de IA; a conversa e os resumos opcionais usam o modelo escolhido por você.
+SecOn Dbrain transforma seus livros, documentações técnicas e anotações em um RAG local acessível por MCP para o fundamentar respostas do seu modelo de IA sem torrar seus tokens desnecessariamente. Adicione PDFs e Markdown, prepare a base de consulta com processamento local e peça ao assistente de IA para consultar os trechos relevantes com referências às fontes. A preparação local não utiliza seu modelo de IA, já a conversa e os resumos opcionais usam o modelo da sua preferência.
 
 ## Pastas da coleção
 
-O perfil público mantém duas áreas de entrada para fontes: `PDFs/` e `Markdown/`. Preserve os arquivos originais, seus nomes e sua localização. Notas, mapas, procedimentos, experimentos e resumos derivados ficam em `Conhecimento/`.
+O projeto é desenvolvido a partir do seu material adicionado nas duas áreas de entrada para fontes: `PDFs/` e `Markdown/` que servirão como a base para a construção de conhecimento consultável para o seu modelo de IA. Os arquivos originais são preservados em seu estado original, mantendo seus nomes, conteúdo e sua localização. Notas, mapas, procedimentos, experimentos e resumos desenvolvidos a partir desse material ficam em `Conhecimento/`.
 
 | Pasta | Conteúdo | Busca |
 |---|---|---|
@@ -18,19 +18,21 @@ O perfil público mantém duas áreas de entrada para fontes: `PDFs/` e `Markdow
 | `Conhecimento/90-Templates/` | Modelos para novas notas | Não |
 | `.dbrain/` | Índice, cache e dados derivados regeneráveis | Não é fonte |
 
-Templates não são indexados. Os guias README explicam cada pasta e também são excluídos da busca. Esta é a configuração padrão da distribuição; bibliotecas privadas devem manter os caminhos de fonte em `Sistema/config.json` (`input_dirs`). Uma entrada PDF existente como `Livros/` pode continuar em uso: não mova os originais para corresponder ao exemplo público.
+Templates são editáveis e não são indexados. Os guias README explicam cada pasta e também são excluídos da busca.
 
-Para o uso comum, adicione material somente nas duas entradas. `prepare` gera fichas e mapas locais; o enriquecimento opcional grava resumos em `Conhecimento/20-Notas/`. As demais categorias permitem curadoria avançada, mas não recebem procedimentos ou experimentos inventados automaticamente.
+Para o uso comum, adicione material somente nas duas entradas "PDFs" e "Markdown". O comando `prepare` gera fichas e mapas locais; o enriquecimento opcional grava resumos em `Conhecimento/20-Notas/`. As demais categorias permitem curadoria avançada, que podem ser preenchidas com apoio do modelo de IA da sua preferência. 
 
 ## Como as camadas funcionam
 
 - **Bronze:** PDFs e Markdown originais preservados.
 - **Silver:** texto extraído, trechos, embeddings, índice lexical FTS5 e vetorial, fusão RRF e mapas heurísticos locais baseados em termos, sem afirmar relações semânticas verificadas. Esses dados ficam em `.dbrain/` e podem ser reconstruídos a partir das fontes e da configuração.
-- **Gold:** resumos opcionais e progressivos, preparados pelo assistente a partir de tarefas de enriquecimento e gravados em `Conhecimento/`. Cada resumo deve citar as unidades de evidência fornecidas, como páginas físicas ou seções. Ele começa como rascunho `needs-review`.
+- **Gold:** resumos opcionais e progressivos, preparados pelo assistente a partir de tarefas de enriquecimento e gravados em `Conhecimento/`. Cada resumo deve citar as unidades de evidência fornecidas, como páginas físicas ou seções. Ele começa como rascunho com status `needs-review`.
+
+## Modelo de busca híbrida
 
 A busca híbrida combina BM25 (palavras-chave, via SQLite FTS5) e similaridade entre embeddings locais (busca semântica), ordenando os resultados por fusão RRF. O modelo recebe trechos selecionados por pergunta. Sínteses ajudam a navegação e não substituem a recuperação do texto original. Mapas e fichas locais recebem versões de conteúdo; versões antigas continuam preservadas e deixam de ser recuperadas quando suas referências ficam obsoletas.
 
-O assistente pode produzir resumos por meio das ferramentas MCP de enriquecimento, se o servidor tiver escrita opt-in habilitada. Esse fluxo usa os trechos recuperados no contexto da conversa; não adiciona uma API de modelo ao SecOn Dbrain. O provedor de IA da conversa pode receber os trechos usados na tarefa.
+O assistente pode produzir resumos por meio das ferramentas MCP de enriquecimento, se o servidor tiver escrita opt-in habilitada. 
 
 ## Início rápido
 
@@ -70,11 +72,11 @@ Depois de copiar fontes para `PDFs/` ou `Markdown/`:
 .venv/bin/python Sistema/dbrain.py search 'tema ou pergunta'
 ```
 
-O download inicial do modelo requer rede. Depois disso, processamento e busca ocorrem localmente. `--lexical` seleciona preparação lexical sem embeddings; escolha esse modo para um índice lexical deliberado, não para trocar silenciosamente o modo de um índice existente.
+Processamento e busca ocorrem localmente.
 
 ## Agentes e MCP
 
-O MCP oferece `search_knowledge`, `read_knowledge`, `knowledge_status`, `knowledge_overview` e `read_enrichment_task` em modo de leitura. `prepare_knowledge`, `plan_enrichment` e `submit_enrichment` são escritores ativados com `--allow-writes`; o instalador pode gerar essa configuração com a mesma opção. A CLI `prepare` é preferível para a preparação inicial, que pode demorar.
+O MCP oferece `search_knowledge`, `read_knowledge`, `knowledge_status`, `knowledge_overview` e `read_enrichment_task` em modo de leitura. `prepare_knowledge`, `plan_enrichment` e `submit_enrichment` são escritores ativados com `--allow-writes`; o instalador pode gerar essa configuração com a mesma opção. A CLI `prepare` é preferível para a preparação inicial, que pode demorar (depende da quantidade de material disponível nas pastas PDF e Markdown).
 
 As skills empacotadas `dbrain-setup` e `dbrain-enrichment` orientam, respectivamente, a configuração e o enriquecimento por lotes. Consulte [Uso](docs/usage.md) para os nomes e parâmetros disponíveis.
 
