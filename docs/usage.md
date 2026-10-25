@@ -129,6 +129,60 @@ A preparação inicial completa pode levar tempo e é melhor executada pela CLI 
 
 Quando conectado, `read_enrichment_task` é sempre disponível para leitura. `plan_enrichment` e `submit_enrichment` só são registrados com `--allow-writes`, pois criam registros e resumos. Leia a skill `dbrain-enrichment` antes de solicitar essa tarefa. O conteúdo lido pode ser enviado ao provedor de IA escolhido para a conversa.
 
+### Checklist rápido e prompts
+
+1. **Prepare o índice pela CLI** depois de adicionar fontes ou na primeira configuração. No Windows, use `.venv\Scripts\python.exe Sistema/dbrain.py prepare --wait 900`; no Ubuntu, `.venv/bin/python Sistema/dbrain.py prepare --wait 900`. Para uma alteração pequena, acrescente `--path '<caminho relativo>'` ao comando da sua plataforma.
+2. **Gere a configuração MCP** a partir da pasta do projeto: `.venv\Scripts\python.exe Sistema/install_agents.py --target generic` (Windows) ou `.venv/bin/python Sistema/install_agents.py --target generic` (Ubuntu). O comando imprime a configuração STDIO; ele não instala nem altera o cliente.
+3. **Copie/adapte a configuração exibida** para o arquivo ou campo MCP do seu cliente. O instalador fornece o comando Python, o caminho do servidor e a raiz desta cópia; clientes podem usar formatos diferentes do exemplo `mcpServers`.
+4. **Recarregue o cliente ou inicie uma nova sessão** para ele abrir o servidor local.
+5. Peça ao cliente para chamar `knowledge_status`. A resposta deve mostrar o estado/cobertura do índice, incluindo fontes conhecidas e possíveis diferenças em relação aos arquivos. Essa ferramenta só consulta o estado: não descobre arquivos novos nem os indexa. Se a fonte esperada não estiver indexada, prepare-a pela CLI e consulte o status novamente.
+
+Depois da conexão, você conversa normalmente com o assistente. Copie um dos prompts abaixo e substitua os campos entre `<...>`:
+
+#### Confirmar a conexão
+
+```text
+Verifique se o MCP SecOn Dbrain está conectado e se minha biblioteca está indexada. Informe se há algum problema ou material desatualizado.
+```
+
+#### Pesquisar um assunto
+
+```text
+Pesquise na biblioteca como <assunto> funciona. Use search_knowledge com limit=5; leia com read_knowledge os 1 ou 2 trechos mais relevantes, usando source_id e locator retornados. Responda apenas o que as evidências sustentam e cite título, fonte e página física do PDF ou seção/linhas do Markdown. Aponte lacunas.
+```
+
+#### Comparar materiais
+
+```text
+Compare o que <documento A ou assunto A> e <documento B ou assunto B> dizem sobre <assunto>. Busque evidências para cada um com até 5 resultados por busca, leia 1 ou 2 trechos de cada documento e cite separadamente fonte e página física/seção. Diferencie concordâncias, diferenças e pontos que os trechos não permitem concluir.
+```
+
+#### Conferir uma evidência
+
+```text
+Leia a evidência identificada por source_id=<source_id> e locator=<locator retornado pela busca> usando read_knowledge. Explique o que este trecho afirma e o que ele não demonstra. Cite a origem e a página física/seção retornada.
+```
+
+#### Investigar uma busca sem resultados
+
+```text
+Não encontrei resultados para <assunto>. Consulte knowledge_status e tente uma busca mais específica e outra com sinônimos ou termos em inglês, com limit=5 em cada uma. Se continuar sem resultado, diga isso claramente e indique se a fonte parece ausente ou ainda não preparada; não invente conteúdo.
+```
+
+#### Limitar o contexto e os tokens
+
+```text
+Responda à pergunta <pergunta> economizando contexto: use search_knowledge com limit=3 (no máximo 5) e leia somente 1 ou 2 trechos com read_knowledge. Cite fonte e página física/seção; informe quando a evidência disponível for insuficiente.
+```
+
+#### Preparar um resumo pequeno (opcional)
+
+```text
+Opcional, apenas se este MCP foi iniciado com --allow-writes: chame plan_enrichment(query="<assunto>", source_ids=["<source_id>"], max_tasks=2, max_input_tokens=4000). Leia cada tarefa com read_enrichment_task(task_id) e sintetize somente o trecho e a referência recebidos, usando [0] nas afirmações sustentadas. Não invente fatos, páginas ou resultados. Só se eu pedir para gravar, use submit_enrichment(task_id, title, summary, citations=[0], by="agent") com [0] literal no resumo.
+```
+
+`search_knowledge` retorna candidatos, trechos e localizadores; `read_knowledge` lê o trecho/página/seção da fonte selecionada, não o livro inteiro. Use o localizador devolvido pela busca para ligar a leitura à evidência encontrada. O MCP disponibiliza contexto ao modelo durante a conversa; não treina o modelo. O grafo do Obsidian é uma visualização opcional de links entre notas: não é o índice vetorial nem prova de que uma resposta está correta.
+
 ## 6. Enriquecer por lotes (opcional)
 
 Enriquecimento cria resumos derivados com evidências citadas. Planeje apenas o tema ou as fontes que respondem à necessidade atual; não tente processar a coleção inteira por padrão. Limite o número de tarefas e o orçamento de tokens, leia cada tarefa antes de produzir o resumo e use somente os IDs de citação/unidades retornados naquela tarefa.

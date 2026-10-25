@@ -24,8 +24,8 @@
     "Sistema/tests/test_portability.py": "6043946288dadf770a763396e7a9695b7e92899b68a84198feb39aeab7338522",
     "Sistema/tests/test_runtime_manifest.py": "8431d62deef3b1148a3e72a663f1429bb85c2e79a679f3b6b158cab9a40206f6",
     "dbrain.ps1": "54c5841bff1dcb928dda58e4f51044a3fbb513207c4865e1830afcaf2181d3cf",
-    "docs/usage.md": "cd8efb8f0c8a723d4f02bc013f424898c04e4605b1a206f8c40ad009855255cd"
+    "docs/usage.md": "d2404c867cd0ffae6294d6f00062d8a76f63c6c3717582498f458c0d3a201f62"
   },
-  "fingerprint": "877eb63572fdc3533a7445dcc4bd92d109319507d10c50a49d104f09ccd736e0",
+  "fingerprint": "b9b3833c50a2018187a2a9b64a046e9e59c79f17289928e965cbe42c0df27cf2",
   "version": 1
 }
