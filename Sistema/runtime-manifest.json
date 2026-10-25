@@ -1,0 +1,31 @@
+{
+  "files": {
+    "Sistema/common.py": "fe50c9e341a891dd72c87d32ce7254eb53f68b6c3872fefb66d7ae575d0a8785",
+    "Sistema/dbrain.py": "5d85c7cee1a5e147d01dce9fdc868b76525786dba14958ac7d05c49f5c0034bf",
+    "Sistema/embeddings.py": "4cd5d04033a506ace7ce5c3cd1e63f839123edb2ac1703782f7b3d6b7528fcae",
+    "Sistema/extraction.py": "3e389d8e23083baff108ed03dfc49b61406b0a7f2eaf4539b164be66f69fd66b",
+    "Sistema/indexer.py": "20797dc27b51593b6dc213b6ce9373f9df869d16681205ec67a9e5c76a74be13",
+    "Sistema/install_agents.py": "fb896822cbdf418da7465f3a2a5f28102b5ed3a5d9c4bdb4fda0129a95a560ee",
+    "Sistema/install_codex.py": "5ae6a40ebdcd932f527c8e4f12867c9a4d5b475ac1f77abdfb12ee74c38434d8",
+    "Sistema/knowledge_pipeline.py": "bb3b9040579f6f7b39d07ad0026c10c5d232cabe3366e17ac5856b02f29fd6cc",
+    "Sistema/library.py": "2400d2a19553e43a43925e25314fbfb579a7ff05c68e33b82fde77537cf1f425",
+    "Sistema/mcp_server.py": "240d93db3f11aa8ce9da6ff596ec3051dca871ceea09903b24b8e36699a6fac7",
+    "Sistema/requirements-lock.txt": "4284f4461368b7a453eb170adc31866d42792693422cdad6f5ce902133f8e5c8",
+    "Sistema/requirements.txt": "6d0e6c59ffa5c7685bf7636b6b8af5e30a82e887b5887bc7424f2e70f39932e5",
+    "Sistema/retrieval.py": "5def0f72bd1585c839410311ff8f1d7dbd6b6d9e1c554d6d70b617441341be04",
+    "Sistema/runtime_manifest.py": "97bf28fd2b2970417ae9f0adc3169ebb1be5cb860dc40706144079825c993fd3",
+    "Sistema/setup_environment.py": "0e02c4565826c771dcd70b9659eb0f82e54333ef527e962c45281f856801ca36",
+    "Sistema/skills/dbrain-enrichment/SKILL.md": "4fbfcded755e5c39fa4e01658e5be52ba5b353f37dc7d146b0ad973c340af818",
+    "Sistema/skills/dbrain-setup/SKILL.md": "f84351f5218930155181093ee7ec721ae953cc04ce01cbbe8a6a2b0da63a48fa",
+    "Sistema/tests/test_distribution_defaults.py": "c3311a9fd9dcbe3e38b2d966ac66c87cfa6392a44782d9a8c6efd70d7ca66b9b",
+    "Sistema/tests/test_incremental.py": "46e48e42a4dd75fe08cfbd697ac1bff54a2a01620f99a5b855a07dd596f7a47f",
+    "Sistema/tests/test_install_agents.py": "5a733c65a888f1c74b62091234fcd326c51da5ab6cd4d59c4cb12a5ec3091017",
+    "Sistema/tests/test_knowledge_pipeline.py": "aa750a8b2acea6342d9edf8da023361c9d6a84aa428d9e5689b358169956872e",
+    "Sistema/tests/test_portability.py": "6043946288dadf770a763396e7a9695b7e92899b68a84198feb39aeab7338522",
+    "Sistema/tests/test_runtime_manifest.py": "8431d62deef3b1148a3e72a663f1429bb85c2e79a679f3b6b158cab9a40206f6",
+    "dbrain.ps1": "54c5841bff1dcb928dda58e4f51044a3fbb513207c4865e1830afcaf2181d3cf",
+    "docs/usage.md": "d2404c867cd0ffae6294d6f00062d8a76f63c6c3717582498f458c0d3a201f62"
+  },
+  "fingerprint": "b9b3833c50a2018187a2a9b64a046e9e59c79f17289928e965cbe42c0df27cf2",
+  "version": 1
+}

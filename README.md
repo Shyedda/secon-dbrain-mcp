@@ -2,6 +2,14 @@
 
 SecOn Dbrain transforma seus livros, documentações técnicas e anotações em um RAG local acessível por MCP para o fundamentar respostas do seu modelo de IA sem torrar seus tokens desnecessariamente. Adicione PDFs e Markdown, prepare a base de consulta com processamento local e peça ao assistente de IA para consultar os trechos relevantes com referências às fontes. A preparação local não utiliza seu modelo de IA, já a conversa e os resumos opcionais usam o modelo da sua preferência.
 
+## Visualização do conhecimento
+
+![Animação de um grafo com notas, fontes e mapas conectados](docs/media/knowledge-graph.gif)
+
+Uma coleção organizada pode ser explorada como um grafo no Obsidian, com conexões entre fontes, notas e mapas. Essa visualização é opcional e depende dos links entre as notas; a IA consulta as evidências pelo RAG/MCP. O GIF usa um trecho ilustrativo sem áudio, títulos pessoais ou páginas dos materiais.
+
+Veja os [exemplos e prompts de uso do MCP](docs/usage.md#checklist-rápido-e-prompts) para consultar sua própria coleção.
+
 ## Pastas da coleção
 
 O projeto é desenvolvido a partir do seu material adicionado nas duas áreas de entrada para fontes: `PDFs/` e `Markdown/` que servirão como a base para a construção de conhecimento consultável para o seu modelo de IA. Os arquivos originais são preservados em seu estado original, mantendo seus nomes, conteúdo e sua localização. Notas, mapas, procedimentos, experimentos e resumos desenvolvidos a partir desse material ficam em `Conhecimento/`.
@@ -31,6 +39,8 @@ Para o uso comum, adicione material somente nas duas entradas "PDFs" e "Markdown
 ## Modelo de busca híbrida
 
 A busca híbrida combina BM25 (palavras-chave, via SQLite FTS5) e similaridade entre embeddings locais (busca semântica), ordenando os resultados por fusão RRF. O modelo recebe trechos selecionados por pergunta. Sínteses ajudam a navegação e não substituem a recuperação do texto original. Mapas e fichas locais recebem versões de conteúdo; versões antigas continuam preservadas e deixam de ser recuperadas quando suas referências ficam obsoletas.
+
+`prepare` mantém os mapas gerados `Conhecimento/00-Inicio/Mapa geral do acervo.md` e `Mapa de temas.md`, com IDs persistentes e histórico local em `.dbrain/knowledge/history/maps/`.
 
 O assistente pode produzir resumos por meio das ferramentas MCP de enriquecimento, se o servidor tiver escrita opt-in habilitada. 
 
@@ -73,6 +83,12 @@ Depois de copiar fontes para `PDFs/` ou `Markdown/`:
 ```
 
 Processamento e busca ocorrem localmente.
+
+## Código compartilhado e coleção privada
+
+As cópias pública e privada usam a mesma implementação da ferramenta; a configuração, o esquema, os templates, o skill personalizado e o acervo podem variar por coleção. O Git privado pode continuar versionando notas e resumos. O pacote público exportado contém a estrutura genérica, sem originais, notas ou resumos da coleção privada.
+
+Para comparar a implementação de duas cópias, use `Sistema/runtime_manifest.py --check` e `Sistema/runtime_manifest.py --compare OUTRO_ROOT`. O manifesto compara fingerprints do código, testes, skills genéricas e guia de uso. Ele exclui configurações e esquema da coleção, corpus, templates, skill personalizado e README do acervo. Para levar mudanças ao repositório público, exporte o pacote a partir do mesmo código e confira os fingerprints; esse fluxo é manual e não sincroniza os repositórios automaticamente.
 
 ## Agentes e MCP
 
