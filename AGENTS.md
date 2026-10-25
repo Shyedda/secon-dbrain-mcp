@@ -20,6 +20,8 @@ SecOn Dbrain recupera evidências de fontes locais PDF e Markdown. Arquivos recu
 
 ## Contribuições ao projeto
 
+- Ao alterar a implementação compartilhada, atualize `Sistema/runtime-manifest.json` com `python Sistema/runtime_manifest.py --write` e valide com `--check`. Use `--compare OUTRA_COLECAO` para conferir a mesma implementação em outra cópia. O manifesto cobre apenas a ferramenta, sem comparar ou publicar configurações e conteúdo das coleções.
+
 - Siga `CONTRIBUTING.md`; mantenha os padrões genéricos e a compatibilidade com esquemas personalizados pelos usuários.
 - Use dados sintéticos em testes e exemplos. Não adicione documentos ou notas da coleção de um usuário.
 - Documente validações e limitações de forma reproduzível. Não infira compatibilidade ou desempenho sem medi-los.

@@ -28,7 +28,9 @@ Para o uso comum, adicione material somente nas duas entradas. `prepare` gera fi
 - **Silver:** texto extraído, trechos, embeddings, índice lexical FTS5 e vetorial, fusão RRF e mapas heurísticos locais baseados em termos, sem afirmar relações semânticas verificadas. Esses dados ficam em `.dbrain/` e podem ser reconstruídos a partir das fontes e da configuração.
 - **Gold:** resumos opcionais e progressivos, preparados pelo assistente a partir de tarefas de enriquecimento e gravados em `Conhecimento/`. Cada resumo deve citar as unidades de evidência fornecidas, como páginas físicas ou seções. Ele começa como rascunho `needs-review`.
 
-A busca híbrida combina BM25 (palavras-chave, via SQLite FTS5) e similaridade entre embeddings locais (busca semântica), ordenando os resultados por fusão RRF. O modelo recebe trechos selecionados por pergunta. Sínteses ajudam a navegação e não substituem a recuperação do texto original. Mapas e fichas locais recebem versões de conteúdo; versões antigas continuam preservadas e deixam de ser recuperadas quando suas referências ficam obsoletas.
+`prepare` mantém os mapas gerados `Conhecimento/00-Inicio/Mapa geral do acervo.md` e `Mapa de temas.md`. IDs de notas são persistentes, e o histórico local dos mapas fica em `.dbrain/knowledge/history/maps/`. Mapas heurísticos ajudam a navegar, mas não prometem cobertura integral nem relações verificadas.
+
+A busca híbrida combina BM25 (palavras-chave, via SQLite FTS5) e similaridade entre embeddings locais (busca semântica), ordenando os resultados por fusão RRF. O modelo recebe trechos selecionados por pergunta. Sínteses ajudam a navegação e não substituem a recuperação do texto original. `prepare` mantém os mapas gerados `Conhecimento/00-Inicio/Mapa geral do acervo.md` e `Mapa de temas.md`; IDs de notas são persistentes, e o histórico local dos mapas fica em `.dbrain/knowledge/history/maps/`. Mapas heurísticos ajudam a navegar, mas não prometem cobertura integral nem relações verificadas.
 
 O assistente pode produzir resumos por meio das ferramentas MCP de enriquecimento, se o servidor tiver escrita opt-in habilitada. Esse fluxo usa os trechos recuperados no contexto da conversa; não adiciona uma API de modelo ao SecOn Dbrain. O provedor de IA da conversa pode receber os trechos usados na tarefa.
 
@@ -71,6 +73,12 @@ Depois de copiar fontes para `PDFs/` ou `Markdown/`:
 ```
 
 O download inicial do modelo requer rede. Depois disso, processamento e busca ocorrem localmente. `--lexical` seleciona preparação lexical sem embeddings; escolha esse modo para um índice lexical deliberado, não para trocar silenciosamente o modo de um índice existente.
+
+## Código compartilhado e coleção privada
+
+As cópias pública e privada usam a mesma implementação da ferramenta; a configuração, o esquema, os templates, o skill personalizado e o acervo podem variar por coleção. O Git privado pode continuar versionando notas e resumos. O pacote público exportado contém a estrutura genérica, sem originais, notas ou resumos da coleção privada.
+
+Para comparar a implementação de duas cópias, use `Sistema/runtime_manifest.py --check` e `Sistema/runtime_manifest.py --compare OUTRO_ROOT`. O manifesto compara fingerprints do código, testes, skills genéricas e guia de uso. Ele exclui configurações e esquema da coleção, corpus, templates, skill personalizado e README do acervo. Para levar mudanças ao repositório público, exporte o pacote a partir do mesmo código e confira os fingerprints; esse fluxo é manual e não sincroniza os repositórios automaticamente.
 
 ## Agentes e MCP
 

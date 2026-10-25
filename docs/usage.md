@@ -18,7 +18,7 @@ A distribuição usa esta estrutura:
 | `Conhecimento/90-Templates/` | Templates opcionais | Não |
 | `.dbrain/` | Índice, cache e derivados técnicos regeneráveis (Silver) | Não é fonte |
 
-Na distribuição genérica, as entradas padrão são `PDFs/` e `Markdown/`. A configuração `input_dirs` define as pastas de fontes de cada biblioteca; em uma cópia privada preexistente, caminhos como `Livros/` podem continuar configurados para PDF. Preserve bytes, nomes e localização dos originais, sem movê-los para corresponder ao exemplo público. Derivados ficam em `knowledge_dir` (padrão `Conhecimento/`). Os guias README têm `rag_exclude: true`; templates nunca entram na busca.
+Na distribuição genérica, as entradas padrão são `PDFs/` e `Markdown/`. A configuração `input_dirs` define as pastas de fontes de cada biblioteca; em uma cópia privada preexistente, caminhos como `Livros/` podem continuar configurados para PDF. Preserve bytes, nomes e localização dos originais, sem movê-los para corresponder ao exemplo público. Derivados ficam em `knowledge_dir` (padrão `Conhecimento/`). Os guias README têm `rag_exclude: true`; templates nunca entram na busca. As cópias pública e privada usam a mesma implementação, mas podem manter configurações, esquemas, templates, skills personalizadas e acervos diferentes. O repositório privado pode continuar versionando suas notas e resumos. O pacote público exportado não inclui originais, notas nem resumos da coleção privada.
 
 A camada **Silver** contém texto extraído, trechos, embeddings, FTS5, índice vetorial, fusão RRF e mapas heurísticos locais baseados em termos, sem afirmar relações semânticas verificadas. São derivados para recuperação e não provam que toda a fonte foi entendida. A camada **Gold** é formada por resumos opcionais e progressivos gerados pelo assistente em tarefas delimitadas, com citações para unidades retornadas. Resumos são Markdown derivado em `Conhecimento/`, com `status: needs-review` até revisão. Não trate nenhum índice ou resumo como garantia de conhecimento completo ou acurácia.
 
@@ -78,7 +78,7 @@ Arquivos em `Conhecimento/90-Templates/` servem para iniciar novas notas, mas n�
 
 ## 3. Preparar e atualizar a busca
 
-Use `prepare` para sincronizar alterações nas fontes, atualizar os mapas heurísticos e indexar os derivados elegíveis em `Conhecimento/`. A preparação completa inicial pode demorar; execute em terminal próprio para que o processo possa terminar. A operação incremental de arquivos existentes deve ser preferida em alterações comuns.
+Use `prepare` para sincronizar alterações nas fontes, atualizar os mapas heurísticos e indexar os derivados elegíveis em `Conhecimento/`. A preparação completa inicial pode demorar; execute em terminal próprio para que o processo possa terminar. A operação incremental de arquivos existentes deve ser preferida em alterações comuns. Os mapas gerados atuais são `Conhecimento/00-Inicio/Mapa geral do acervo.md` e `Mapa de temas.md`. IDs de notas permanecem estáveis; o histórico dos mapas gerados fica local em `.dbrain/knowledge/history/maps/`. Os mapas são auxiliares heurísticos, sem promessa de cobertura integral.
 
 Windows:
 
@@ -156,13 +156,24 @@ submit_enrichment(task_id, title, summary, citations: list[int], by='agent')
 O envio cria um Markdown derivado em `Conhecimento/20-Notas/`, indexa-o e registra `source_refs` com o hash e os localizadores da fonte. A nota nasce em `needs-review`. A validação verifica a estrutura da citação e a versão da fonte, mas não a fidelidade semântica do resumo. A busca exclui derivados quando detecta mudanças pela versão indexada ou pelo tamanho/data dos arquivos. A leitura de Gold também verifica o hash real da fonte e recusa a síntese se os bytes divergirem. Sempre leia o resultado antes de fundamentar a resposta. Execute `prepare` e planeje uma tarefa nova para fontes alteradas. Não invente fatos, páginas, resultados ou experimentos executados. O fluxo usa trechos no contexto do assistente, não treina o modelo e não faz chamadas a uma API de geração do projeto.
 ## 7. Privacidade e limites
 
+### Comparar a implementação entre repositórios
+
+As configurações e o conteúdo da coleção podem diferir entre cópias que usam o mesmo código. Para conferir se a implementação está alinhada, execute a partir da cópia de referência:
+
+```powershell
+.venv\Scripts\python.exe Sistema/runtime_manifest.py --check
+.venv\Scripts\python.exe Sistema/runtime_manifest.py --compare 'C:\caminho\para\outra-copia'
+```
+
+No Ubuntu, use `.venv/bin/python` no lugar do executável Windows. O manifesto compara fingerprints de código, testes, skills genéricas e guia de uso. Ele exclui config/schema da coleção, corpus, templates, skill personalizada e README do acervo, pois esses arquivos podem ser específicos de cada biblioteca. Ao publicar mudanças na implementação, exporte o pacote público a partir do mesmo código e valide os fingerprints; isso é uma etapa manual, não uma sincronização automática.
+
 ### Personalizar o contexto da coleção
 
 O esquema inicial em `Sistema/schema.json` contém somente a área `geral`, sem um perfil profissional predefinido. Acrescente suas próprias áreas nesse arquivo e use seus identificadores nos metadados das notas. `list_fields`, `patterns` e `filters` permitem definir campos de classificação adequados à sua coleção; campos listados em `list_fields` devem conter listas no YAML. O parâmetro `schema_file` em `Sistema/config.json` também permite apontar para outro esquema local.
 
 Sinônimos opcionais de busca ficam em `lexical_expansions`, no formato `{"termo": "termo equivalente"}`, em `Sistema/config.json`; o padrão é vazio. Essas configurações são escolhas da sua instalação. Não inclua preferências, caminhos, instruções ou conteúdo pessoal em contribuições públicas. Confira o diff dos arquivos de configuração antes de publicar.
 
-Arquivos originais permanecem sob controle local e devem ser preservados. Índices, embeddings, extrações, cache e outros derivados técnicos ficam em `.dbrain/`; conteúdo privado e dados locais são ignorados pelo Git conforme a configuração da distribuição. Confira `git status` antes de compartilhar uma alteração.
+Arquivos originais permanecem sob controle da coleção e devem ser preservados. O repositório privado pode versionar notas e resumos para manter seu histórico; o pacote público exportado fica sem esses conteúdos e sem os originais. Índices, embeddings, extrações, cache e outros derivados técnicos ficam em `.dbrain/` e são dados locais regeneráveis. Confira `git status` e o conteúdo exportado antes de compartilhar uma alteração.
 
 Trechos retornados pelo MCP podem ser enviados ao provedor de IA usado na conversa. Não indexe credenciais, segredos ou conteúdo que não possa ser compartilhado com esse serviço. Extração e recuperação têm limites, mapas heurísticos podem errar e resumos opcionais podem omitir contexto. Valide na fonte antes de usar uma afirmação como fato. Nunca registre um experimento como executado sem evidência de que foi realizado.
 
